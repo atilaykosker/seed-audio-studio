@@ -1,4 +1,6 @@
-import { AudioLines, Loader2 } from 'lucide-react'
+import { AudioLines, Loader2, Github } from 'lucide-react'
+
+const REPO_URL = 'https://github.com/egebese/seed-audio-studio'
 import { Badge, Card, CardContent, Separator } from '@/components/ui'
 import { BriefForm } from '@/components/BriefForm'
 import { VoiceLibraryPanel } from '@/components/VoiceLibraryPanel'
@@ -19,7 +21,18 @@ export function Studio() {
         <div className="mx-auto max-w-6xl px-5 py-3 flex items-center gap-2.5">
           <AudioLines className="size-5 text-primary" />
           <span className="font-semibold leading-tight">Seed Audio Studio</span>
-          <span className="ml-auto text-xs text-muted-foreground hidden sm:inline">Ebook → multi-voice audiobook</span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-xs text-muted-foreground hidden sm:inline">Ebook → multi-voice audiobook</span>
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View source on GitHub"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              <Github className="size-3.5" /> GitHub
+            </a>
+          </div>
         </div>
       </header>
 

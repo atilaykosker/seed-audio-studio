@@ -144,8 +144,21 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border/40 mt-8">
       <div className="mx-auto max-w-5xl px-5 py-8 text-center text-xs text-muted-foreground">
-        Seed Audio Studio — an AI ebook-to-audiobook generator with a distinct voice per character. Browser-based,
-        bring-your-own-key. Powered by ByteDance Seed Audio 1.0 on fal.ai.
+        <p>
+          Seed Audio Studio — an AI ebook-to-audiobook generator with a distinct voice per character. Browser-based,
+          bring-your-own-key. Powered by ByteDance Seed Audio 1.0 on fal.ai.
+        </p>
+        <p className="mt-2">
+          Open source (MIT) ·{' '}
+          <a
+            href="https://github.com/egebese/seed-audio-studio"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground transition-colors"
+          >
+            View / fork on GitHub
+          </a>
+        </p>
       </div>
     </footer>
   )
