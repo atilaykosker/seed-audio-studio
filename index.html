@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <title>Ebook to Audiobook AI — Multi-Voice Audiobook Generator | Seed Audio Studio</title>
+    <meta
+      name="description"
+      content="Turn an ebook chapter or scene into a multi-voice AI audiobook. Seed Audio Studio gives every character its own voice, with sound effects and atmosphere — generated in your browser with your own fal key. Free, bring-your-own-key."
+    />
+    <link rel="canonical" href="https://seed-audio-studio.vercel.app/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://seed-audio-studio.vercel.app/" />
+    <meta property="og:title" content="Ebook to Audiobook AI — Multi-Voice Audiobook Generator" />
+    <meta
+      property="og:description"
+      content="Convert an ebook chapter into a cinematic multi-voice audiobook — a distinct AI voice per character, plus sound effects and music. Browser-based, bring-your-own-key."
+    />
+    <meta property="og:site_name" content="Seed Audio Studio" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ebook to Audiobook AI — Multi-Voice Audiobook Generator" />
+    <meta
+      name="twitter:description"
+      content="Give every character its own AI voice. Turn an ebook chapter into a multi-voice audiobook with sound effects, in your browser."
+    />
+
+    <!-- Structured data: helps Google AI Overviews, ChatGPT, Perplexity, Gemini understand + cite the page -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Seed Audio Studio",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Web browser",
+        "url": "https://seed-audio-studio.vercel.app/",
+        "description": "A browser-based AI tool that converts an ebook chapter, scene, or script into a multi-voice audiobook. An LLM identifies the characters, assigns each a distinct voice, and generates the narration with sound effects and atmosphere using the ByteDance Seed Audio 1.0 model.",
+        "featureList": [
+          "Multi-voice narration — a distinct AI voice per character",
+          "Automatic character and scene planning by an LLM",
+          "Sound effects, ambience, and music generated from the text",
+          "Voice cloning — bring your own voice sample as a reference",
+          "Runs entirely in the browser with your own fal.ai API key"
+        ],
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How do I turn an ebook into an audiobook with AI?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Paste a chapter, scene, or passage from your ebook into Seed Audio Studio and click Generate. An LLM reads the text, identifies the characters, assigns each one a distinct AI voice, and the Seed Audio 1.0 model produces a multi-voice audiobook with sound effects and atmosphere — all in your browser using your own fal.ai API key."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can AI give each character in a book a different voice?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Seed Audio Studio automatically detects the characters in your text and casts a distinct voice for each, then binds those voices to the dialogue so the narrator, the protagonist, and every other character sound different — like a full-cast audiobook rather than a single narrator."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use my own voice as the narrator?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Upload a short voice sample (up to 30 seconds) to the voice library, then pin it as a reference in the brief. The planner casts your sample as a character and uses it as the reference voice for the generated audiobook, instead of minting a new voice."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is the ebook-to-audiobook converter free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The app itself is free and runs in your browser. You bring your own fal.ai API key and pay fal directly for generation — the Seed Audio 1.0 model costs about $0.1875 per minute of audio. Your key is stored only in your browser."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What makes this different from ElevenLabs or other AI audiobook tools?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Most AI audiobook tools narrate with a single voice you pick manually. Seed Audio Studio plans the whole scene automatically: it categorizes the content, casts a different voice per character, and bakes in sound effects, ambience, and music from one prompt — producing a cinematic, full-cast result with a single click."
+            }
+          }
+        ]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "Example AI audiobooks made from public-domain books",
+        "itemListElement": [
+          {
+            "@type": "VideoObject",
+            "name": "The Speckled Band — full-cast AI audiobook (Sherlock Holmes)",
+            "description": "A multi-voice AI audiobook scene from Arthur Conan Doyle's Sherlock Holmes, with a distinct voice per character, sound effects, and word-synced captions.",
+            "uploadDate": "2026-06-29",
+            "contentUrl": "https://v3b.fal.media/files/b/0aa04213/51XyG69HKxp8T22d8SHax_sherlock.mp4"
+          },
+          {
+            "@type": "VideoObject",
+            "name": "Down the Rabbit-Hole — full-cast AI audiobook (Alice in Wonderland)",
+            "description": "A multi-voice AI audiobook scene from Lewis Carroll's Alice in Wonderland with Narrator, Alice, and the White Rabbit, plus sound effects.",
+            "uploadDate": "2026-06-29",
+            "contentUrl": "https://v3b.fal.media/files/b/0aa0425a/4eMfqDpBhUv4oRnMZ0kac_alice.mp4"
+          },
+          {
+            "@type": "VideoObject",
+            "name": "Marley's Ghost — full-cast AI audiobook (A Christmas Carol)",
+            "description": "A multi-voice AI audiobook scene from Charles Dickens's A Christmas Carol with Narrator, Scrooge, and Marley's Ghost, plus sound effects.",
+            "uploadDate": "2026-06-29",
+            "contentUrl": "https://v3b.fal.media/files/b/0aa0425b/-Tjhl9DrNg-mZW-1uKOZu_carol.mp4"
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Static content for crawlers / AI systems that don't execute JavaScript -->
+    <noscript>
+      <main>
+        <h1>Ebook to Audiobook AI — turn any chapter into a multi-voice audiobook</h1>
+        <p>
+          Seed Audio Studio is a free, browser-based tool that converts an ebook chapter, scene, or script into a
+          cinematic multi-voice audiobook. An LLM identifies the characters in your text, gives each one a distinct AI
+          voice, and the ByteDance Seed Audio 1.0 model generates the narration with sound effects and atmosphere.
+          It runs entirely in your browser with your own fal.ai API key.
+        </p>
+        <h2>How it works</h2>
+        <ol>
+          <li>Paste a chapter, scene, or passage from your ebook.</li>
+          <li>The AI plans the characters, casts a voice for each, and writes the audiobook script with effects.</li>
+          <li>Seed Audio 1.0 generates the multi-voice audiobook — play, download, or regenerate.</li>
+        </ol>
+        <h2>Frequently asked questions</h2>
+        <p><strong>How do I turn an ebook into an audiobook with AI?</strong> Paste your text and click Generate; the
+          AI casts a distinct voice per character and produces a multi-voice audiobook with sound effects.</p>
+        <p><strong>Can AI give each character a different voice?</strong> Yes — Seed Audio Studio detects characters
+          and assigns each a unique voice, like a full-cast audiobook.</p>
+        <p><strong>Can I use my own voice?</strong> Yes — upload a short sample and pin it as a reference voice.</p>
+      </main>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

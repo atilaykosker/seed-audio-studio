@@ -1,0 +1,10 @@
+{
+  "servers": [
+    {
+      "name": "seed-audio-studio",
+      "command": "pnpm dev",
+      "cwd": ".",
+      "url": "http://localhost:5173"
+    }
+  ]
+}

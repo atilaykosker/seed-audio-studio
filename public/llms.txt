@@ -1,0 +1,28 @@
+# Seed Audio Studio
+
+> Free, browser-based AI tool that turns an ebook chapter, scene, or script into a
+> multi-voice audiobook. An LLM identifies the characters in the text and casts a
+> distinct voice for each, then generates the narration with sound effects, ambience,
+> and music using the ByteDance Seed Audio 1.0 model. Bring-your-own-key (fal.ai);
+> nothing leaves the user's browser.
+
+## What it does
+- Ebook to audiobook: paste a chapter/scene -> get a full-cast multi-voice audiobook.
+- A distinct AI voice per character (narrator, protagonist, antagonist, etc.).
+- Automatic sound effects, ambience, and music woven in from the text.
+- Voice cloning: upload a 30s sample and pin it as a character's reference voice.
+- One-click: an LLM (via fal's OpenRouter gateway) plans characters, scenes, and effects.
+
+## How it differs
+- Most AI audiobook tools use a single narrator voice you pick manually.
+- Seed Audio Studio auto-casts a different voice per character and adds effects in one click.
+
+## Pricing
+- App: free. Generation: pay fal.ai directly, ~$0.1875 per minute of audio (Seed Audio 1.0).
+
+## Key pages
+- Home / app: https://seed-audio-studio.vercel.app/
+
+## Tech
+- Seed Audio 1.0 (bytedance/seed-audio-1.0) for audio; OpenRouter (openrouter/router) for planning.
+- Static SPA, runs client-side with the user's own fal.ai API key.
