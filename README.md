@@ -1,5 +1,13 @@
 # Seed Audio Studio
 
+[![Live demo](https://img.shields.io/badge/demo-seed--audio--studio.vercel.app-000?logo=vercel)](https://seed-audio-studio.vercel.app)
+[![CI](https://github.com/egebese/seed-audio-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/egebese/seed-audio-studio/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/egebese/seed-audio-studio)
+
+**▶ Live: https://seed-audio-studio.vercel.app**
+
 Browser-based **BYOK** (bring-your-own-key) studio that turns a one-line brief into a
 fully-structured, multi-voice **Seed Audio 1.0** generation — no backend.
 
@@ -46,3 +54,10 @@ Static SPA. `pnpm build` → deploy `dist/` to Vercel (see `vercel.json` SPA rew
 ## Notes / limits
 - Reference clips ≤3 per scene, each ≤30s; prompts ≤2048 chars; output ≤2 min; EN/ZH.
 - Out of scope (v1): scene images, karaoke/MP4 video, server-side rendering.
+
+## Contributing
+PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md). `main` auto-deploys to production via
+Vercel; pull requests get an automatic preview URL.
+
+## License
+[MIT](./LICENSE) © egebese
