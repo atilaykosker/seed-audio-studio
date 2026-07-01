@@ -1,7 +1,9 @@
 import { seedAudio, uploadAsset, type QueuePhase } from '@/services/fal/client'
 import { fetchAndTrim } from '@/services/audio/trim'
+import { mintCharacterImage, sceneKeyframe } from './image'
+import { generateSceneVideo } from './video'
 import { uid } from '@/lib/utils'
-import type { Character, Plan, Scene, Voice } from '@/lib/types'
+import type { Character, CharacterImage, Plan, Scene, Voice } from '@/lib/types'
 
 export interface GenerateCallbacks {
   onMintStart?: (name: string) => void
@@ -10,6 +12,12 @@ export interface GenerateCallbacks {
   onScenePhase?: (sceneId: string, phase: QueuePhase) => void
   onScene?: (sceneId: string, result: { url: string; durationSec: number }) => void
   onError?: (scope: string, message: string) => void
+  // video mode
+  onCharacterImage?: (img: CharacterImage) => void
+  onKeyframe?: (sceneId: string, url: string) => void
+  onSceneVideoStart?: (sceneId: string) => void
+  onSceneVideoPhase?: (sceneId: string, phase: QueuePhase) => void
+  onSceneVideo?: (sceneId: string, url: string) => void
 }
 
 /** Mint one character's reference voice: T2A → trim ≤28s → upload to fal CDN. */
@@ -66,42 +74,76 @@ export async function generateScene(
 }
 
 /**
- * Full pipeline: mint any missing character voices, then generate every scene in order.
- * `library` voices whose name matches a character are reused (no re-mint).
+ * Full pipeline: mint any missing character voices (and, in video mode, character images),
+ * then generate every scene in order (audio, then keyframe + video when `withVideo`).
+ * `library` voices and `characterLibrary` images whose name matches a character are reused.
  */
 export async function generateFromPlan(
   plan: Plan,
-  args: { library: Voice[] },
+  args: { library: Voice[]; characterLibrary?: CharacterImage[]; withVideo?: boolean },
   cb: GenerateCallbacks = {},
 ): Promise<void> {
+  const withVideo = !!args.withVideo
   const urlByName = new Map<string, string>()
   for (const v of args.library) urlByName.set(v.name.toLowerCase(), v.url)
 
-  // Map character name -> url, minting if absent.
+  // Character voice url + (video) image url, by character name.
   const resolved = new Map<string, string>()
+  const imageByName = new Map<string, string>()
+  for (const img of args.characterLibrary ?? []) imageByName.set(img.name.toLowerCase(), img.url)
+
   for (const c of plan.characters) {
-    const existing = urlByName.get(c.name.toLowerCase())
+    const key = c.name.toLowerCase()
+    const existing = urlByName.get(key)
     if (existing) {
       resolved.set(c.name, existing)
-      continue
+    } else {
+      cb.onMintStart?.(c.name)
+      try {
+        const v = await mintVoice(c)
+        cb.onVoice?.(v)
+        resolved.set(c.name, v.url)
+      } catch (e) {
+        cb.onError?.(`voice:${c.name}`, e instanceof Error ? e.message : String(e))
+      }
     }
-    cb.onMintStart?.(c.name)
-    try {
-      const v = await mintVoice(c)
-      cb.onVoice?.(v)
-      resolved.set(c.name, v.url)
-    } catch (e) {
-      cb.onError?.(`voice:${c.name}`, e instanceof Error ? e.message : String(e))
+    if (withVideo && !imageByName.has(key)) {
+      try {
+        const img = await mintCharacterImage(c)
+        cb.onCharacterImage?.(img)
+        imageByName.set(key, img.url)
+      } catch (e) {
+        cb.onError?.(`image:${c.name}`, e instanceof Error ? e.message : String(e))
+      }
     }
   }
 
   for (const scene of plan.scenes) {
     cb.onSceneStart?.(scene.id)
+    let durationSec = 10
     try {
       const r = await generateScene(scene, resolved, cb)
+      durationSec = r.durationSec || 10
       cb.onScene?.(scene.id, r)
     } catch (e) {
       cb.onError?.(`scene:${scene.id}`, e instanceof Error ? e.message : String(e))
+    }
+
+    if (withVideo) {
+      cb.onSceneVideoStart?.(scene.id)
+      try {
+        const presentImages = scene.speakers
+          .map((n) => imageByName.get(n.toLowerCase()))
+          .filter((u): u is string => !!u)
+        const keyframe = await sceneKeyframe(scene, presentImages)
+        cb.onKeyframe?.(scene.id, keyframe)
+        const v = await generateSceneVideo(scene, keyframe, presentImages, durationSec, (p) =>
+          cb.onSceneVideoPhase?.(scene.id, p),
+        )
+        cb.onSceneVideo?.(scene.id, v.url)
+      } catch (e) {
+        cb.onError?.(`video:${scene.id}`, e instanceof Error ? e.message : String(e))
+      }
     }
   }
 }
