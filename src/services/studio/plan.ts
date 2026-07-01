@@ -1,7 +1,7 @@
 import { llmText, type RunOptions } from '@/services/fal/client'
 import type { Brief, Plan, Scene, Voice } from '@/lib/types'
 import { uid } from '@/lib/utils'
-import { SEED_AUDIO_GUIDE, OUTPUT_DIRECTIVE } from './guide'
+import { SEED_AUDIO_GUIDE, OUTPUT_DIRECTIVE, VIDEO_DIRECTIVE } from './guide'
 
 export function buildPlanPrompt(b: Brief, provided: Voice[] = []): string {
   const speakers =
@@ -13,6 +13,9 @@ export function buildPlanPrompt(b: Brief, provided: Voice[] = []): string {
         ...provided.map((v) => `- ${v.name}: ${v.voiceSpec || 'a user-provided voice sample'}`),
       ].join('\n')
     : ''
+  const videoBlock = b.withVideo
+    ? 'Video mode is ON: keep every scene <= 15 seconds of audio (split as needed), and include an "appearance" for each character and a "visual" for each scene.'
+    : ''
   return [
     `Brief: ${b.idea.trim()}`,
     `Target total length: about ${b.durationSec} seconds.`,
@@ -20,6 +23,7 @@ export function buildPlanPrompt(b: Brief, provided: Voice[] = []): string {
     speakers,
     genre,
     providedBlock,
+    videoBlock,
     `Plan the characters and the scene(s) needed to realize this, following all the rules. Categorize it and weave in fitting SFX/atmosphere/music.`,
   ]
     .filter(Boolean)
@@ -28,8 +32,8 @@ export function buildPlanPrompt(b: Brief, provided: Voice[] = []): string {
 
 interface RawPlan {
   category?: string
-  characters?: { name?: string; voiceSpec?: string; refPrompt?: string }[]
-  scenes?: { kind?: string; title?: string; speakers?: string[]; prompt?: string }[]
+  characters?: { name?: string; voiceSpec?: string; refPrompt?: string; appearance?: string }[]
+  scenes?: { kind?: string; title?: string; speakers?: string[]; prompt?: string; visual?: string }[]
 }
 
 /** Pull the first balanced JSON object out of an LLM response (tolerates fences/prose). */
@@ -50,7 +54,12 @@ export function parsePlan(text: string): Plan {
   }
   const characters = raw.characters
     .filter((c) => c.name && c.refPrompt)
-    .map((c) => ({ name: c.name!.trim(), voiceSpec: (c.voiceSpec ?? '').trim(), refPrompt: c.refPrompt!.trim() }))
+    .map((c) => ({
+      name: c.name!.trim(),
+      voiceSpec: (c.voiceSpec ?? '').trim(),
+      refPrompt: c.refPrompt!.trim(),
+      ...(c.appearance && c.appearance.trim() ? { appearance: c.appearance.trim() } : {}),
+    }))
   const scenes: Scene[] = raw.scenes
     .filter((s) => s.prompt)
     .map((s) => ({
@@ -59,6 +68,7 @@ export function parsePlan(text: string): Plan {
       title: (s.title ?? 'Scene').trim(),
       speakers: (s.speakers ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 3),
       prompt: s.prompt!.trim(),
+      ...(s.visual && s.visual.trim() ? { visual: s.visual.trim() } : {}),
     }))
   if (!scenes.length) throw new Error('LLM plan has no scenes.')
   return { category: (raw.category ?? 'Other').trim(), characters, scenes }
@@ -72,11 +82,12 @@ export async function makePlan(
   opts: RunOptions = {},
 ): Promise<Plan> {
   const userPrompt = buildPlanPrompt(brief, provided)
+  const systemBase = SEED_AUDIO_GUIDE + OUTPUT_DIRECTIVE + (brief.withVideo ? VIDEO_DIRECTIVE : '')
   const attempt = async (extra = '') =>
     parsePlan(
       await llmText(
         {
-          systemPrompt: SEED_AUDIO_GUIDE + OUTPUT_DIRECTIVE + extra,
+          systemPrompt: systemBase + extra,
           prompt: userPrompt,
           model,
           temperature: 0.7,

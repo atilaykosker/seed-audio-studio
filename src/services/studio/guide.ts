@@ -56,3 +56,12 @@ Rules:
 - If a scene is T2A, "speakers" may be empty and the prompt describes voices inline (no @Audio tags).
 - Prefer TA2A when characters recur across scenes (so their minted voice is reused).
 - Keep every "prompt" under 2000 characters and <=3 referenced speakers.`
+
+/** Extra directives appended (system + schema) when the user enabled video mode. */
+export const VIDEO_DIRECTIVE = `
+
+# VIDEO MODE (the user will also render each scene as a short video)
+- Each scene's audio MUST be short enough to render as a single <= 15 seconds video clip. Keep every scene <= 15 seconds of spoken audio; SPLIT longer beats into more sequential scenes.
+- For EACH character add an "appearance" field: a concise visual description for a character reference image (age, build, hair, clothing, distinctive features, art style). One consistent look — this image is reused across every scene.
+- For EACH scene add a "visual" field: a concrete shot description (setting, framing, camera move, lighting, action). Reference the speaking characters as @Element1, @Element2, @Element3 in @-order matching scene.speakers, so the video keeps them consistent. Narrator/no-speaker scenes have empty speakers and an atmospheric "visual" with no @Element references.
+- Extend the JSON schema: characters[] items also include "appearance": string; scenes[] items also include "visual": string.`
