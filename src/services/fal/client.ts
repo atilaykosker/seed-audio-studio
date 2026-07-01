@@ -249,7 +249,15 @@ export async function klingVideo(
   opts: RunOptions = {},
 ): Promise<{ url: string }> {
   const duration = String(Math.min(15, Math.max(3, Math.round(args.durationSec ?? 5))))
-  const elements = args.elements && args.elements.length ? args.elements.slice(0, 3) : []
+  // kling requires each element to carry BOTH frontal_image_url AND reference_image_urls
+  // (or a video_url). We only mint one image per character, so reuse it as the reference.
+  const elements: KlingElement[] = (args.elements && args.elements.length ? args.elements.slice(0, 3) : []).map(
+    (el) => ({
+      frontal_image_url: el.frontal_image_url,
+      reference_image_urls:
+        el.reference_image_urls && el.reference_image_urls.length ? el.reference_image_urls : [el.frontal_image_url],
+    }),
+  )
   const input: Record<string, unknown> = {
     prompt: stripInvalidElementRefs(args.prompt, elements.length),
     start_image_url: args.startImageUrl,

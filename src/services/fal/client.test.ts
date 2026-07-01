@@ -74,6 +74,8 @@ describe('klingVideo', () => {
       generate_audio: false,
     })
     expect(cfg.input.elements).toHaveLength(3)
+    // kling requires reference_image_urls alongside frontal_image_url — default to the frontal.
+    expect(cfg.input.elements[0]).toEqual({ frontal_image_url: 'https://a', reference_image_urls: ['https://a'] })
   })
 
   it('omits elements when none are given', async () => {
