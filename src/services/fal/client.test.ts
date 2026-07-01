@@ -9,7 +9,17 @@ vi.mock('@fal-ai/client', () => ({
 }))
 
 import { fal } from '@fal-ai/client'
-import { nanoBanana, klingVideo, seedAudio, clampPrompt, run, TimeoutError, ENDPOINTS, SEED_AUDIO_MAX_PROMPT } from './client'
+import {
+  nanoBanana,
+  klingVideo,
+  seedAudio,
+  clampPrompt,
+  stripInvalidElementRefs,
+  run,
+  TimeoutError,
+  ENDPOINTS,
+  SEED_AUDIO_MAX_PROMPT,
+} from './client'
 
 const subscribe = fal.subscribe as ReturnType<typeof vi.fn>
 
@@ -72,6 +82,26 @@ describe('klingVideo', () => {
     const cfg = subscribe.mock.calls[0][1]
     expect(cfg.input.elements).toBeUndefined()
     expect(cfg.input.duration).toBe('3') // clamped up to min 3
+  })
+
+  it('strips @ElementN from the prompt when no elements are provided', async () => {
+    subscribe.mockResolvedValue({ data: { video: { url: 'https://v/3' } }, requestId: 'r' })
+    await klingVideo({ prompt: '@Element1 and @Element2 chat in the rain', startImageUrl: 'https://key' })
+    const cfg = subscribe.mock.calls[0][1]
+    expect(cfg.input.prompt).not.toMatch(/@Element/)
+    expect(cfg.input.elements).toBeUndefined()
+  })
+})
+
+describe('stripInvalidElementRefs', () => {
+  it('removes refs beyond the element count', () => {
+    expect(stripInvalidElementRefs('@Element1 and @Element2 talk', 1)).toBe('@Element1 and talk')
+  })
+  it('strips every ref when zero elements', () => {
+    expect(stripInvalidElementRefs('@Element1 waves at @Element2', 0)).toBe('waves at')
+  })
+  it('keeps refs within range', () => {
+    expect(stripInvalidElementRefs('@Element1 and @Element2', 2)).toBe('@Element1 and @Element2')
   })
 })
 

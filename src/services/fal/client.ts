@@ -231,19 +231,32 @@ interface KlingVideoOutput {
   video: { url: string; content_type?: string; file_name?: string; file_size?: number }
 }
 
+/**
+ * Drop `@ElementN` references that exceed the number of elements actually sent —
+ * kling rejects a prompt that references an element index it wasn't given (HTTP 422).
+ */
+export function stripInvalidElementRefs(prompt: string, elementCount: number): string {
+  return prompt
+    .replace(/@Element\s*(\d+)/gi, (m, n) => (Number(n) >= 1 && Number(n) <= elementCount ? m : ''))
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim()
+}
+
 /** Generate one kling v3 image-to-video clip. Audio disabled; duration clamped to [3,15]. */
 export async function klingVideo(
   args: { prompt: string; startImageUrl: string; durationSec?: number; elements?: KlingElement[] },
   opts: RunOptions = {},
 ): Promise<{ url: string }> {
   const duration = String(Math.min(15, Math.max(3, Math.round(args.durationSec ?? 5))))
+  const elements = args.elements && args.elements.length ? args.elements.slice(0, 3) : []
   const input: Record<string, unknown> = {
-    prompt: args.prompt,
+    prompt: stripInvalidElementRefs(args.prompt, elements.length),
     start_image_url: args.startImageUrl,
     duration,
     generate_audio: false,
   }
-  if (args.elements && args.elements.length) input.elements = args.elements.slice(0, 3)
+  if (elements.length) input.elements = elements
   const { data } = await run<KlingVideoOutput>(ENDPOINTS.klingVideo, input, { timeoutMs: TIMEOUTS.video, ...opts })
   return { url: data.video.url }
 }
