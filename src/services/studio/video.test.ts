@@ -1,15 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { klingVideo } = vi.hoisted(() => {
-  return { klingVideo: vi.fn() }
+const { klingVideo, latentSync } = vi.hoisted(() => {
+  return { klingVideo: vi.fn(), latentSync: vi.fn() }
 })
 
-vi.mock('@/services/fal/client', () => ({ klingVideo }))
+vi.mock('@/services/fal/client', () => ({ klingVideo, latentSync }))
 
-import { generateSceneVideo, buildElementPrompt } from './video'
+import { generateSceneVideo, buildElementPrompt, lipSyncScene } from './video'
 import type { Scene } from '@/lib/types'
 
-beforeEach(() => klingVideo.mockReset())
+beforeEach(() => {
+  klingVideo.mockReset()
+  latentSync.mockReset()
+})
 
 const scene: Scene = { id: '1', kind: 'TA2A', title: 't', speakers: ['A', 'B'], prompt: 'p', visual: '@Element1 and @Element2 talk' }
 
@@ -62,5 +65,17 @@ describe('buildElementPrompt', () => {
     const r = buildElementPrompt('@Element1 and @Element2 chat', [undefined, undefined])
     expect(r.elements).toEqual([])
     expect(r.prompt).not.toMatch(/@Element/)
+  })
+})
+
+describe('lipSyncScene', () => {
+  it('passes the video + audio urls through to latentSync and wires onPhase', async () => {
+    latentSync.mockResolvedValue({ url: 'https://combined' })
+    const onPhase = vi.fn()
+    const r = await lipSyncScene('https://vid', 'https://aud', onPhase)
+    expect(r.url).toBe('https://combined')
+    const [args, opts] = latentSync.mock.calls[0]
+    expect(args).toEqual({ videoUrl: 'https://vid', audioUrl: 'https://aud' })
+    expect(typeof opts.onProgress).toBe('function')
   })
 })
