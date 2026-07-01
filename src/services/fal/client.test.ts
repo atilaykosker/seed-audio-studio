@@ -13,6 +13,7 @@ import {
   nanoBanana,
   klingVideo,
   seedAudio,
+  latentSync,
   clampPrompt,
   stripInvalidElementRefs,
   run,
@@ -170,5 +171,16 @@ describe('run timeout/abort', () => {
     const p = run('ep', {}, { signal: ext.signal })
     ext.abort()
     await expect(p).rejects.toThrow(/aborted/i)
+  })
+})
+
+describe('latentSync', () => {
+  it('sends video_url + audio_url and returns the combined video url', async () => {
+    subscribe.mockResolvedValue({ data: { video: { url: 'https://combined/1' } }, requestId: 'r' })
+    const r = await latentSync({ videoUrl: 'https://vid', audioUrl: 'https://aud' })
+    expect(r.url).toBe('https://combined/1')
+    const [endpoint, cfg] = subscribe.mock.calls[0]
+    expect(endpoint).toBe(ENDPOINTS.latentSync)
+    expect(cfg.input).toEqual({ video_url: 'https://vid', audio_url: 'https://aud' })
   })
 })

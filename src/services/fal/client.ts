@@ -99,6 +99,8 @@ export const ENDPOINTS = {
   nanoBananaEdit: 'fal-ai/nano-banana/edit',
   /** Image-to-video with custom elements for cross-clip consistency. */
   klingVideo: 'fal-ai/kling-video/v3/pro/image-to-video',
+  /** Lip-sync / dubbing: fuse a video + audio into one lip-synced clip. */
+  latentSync: 'fal-ai/latentsync',
 } as const
 
 export interface ModelOption {
@@ -266,5 +268,22 @@ export async function klingVideo(
   }
   if (elements.length) input.elements = elements
   const { data } = await run<KlingVideoOutput>(ENDPOINTS.klingVideo, input, { timeoutMs: TIMEOUTS.video, ...opts })
+  return { url: data.video.url }
+}
+
+interface LatentSyncOutput {
+  video: { url: string; content_type?: string; file_name?: string; file_size?: number }
+}
+
+/** Lip-sync a video to an audio track, returning a single combined clip (audio embedded). */
+export async function latentSync(
+  args: { videoUrl: string; audioUrl: string },
+  opts: RunOptions = {},
+): Promise<{ url: string }> {
+  const { data } = await run<LatentSyncOutput>(
+    ENDPOINTS.latentSync,
+    { video_url: args.videoUrl, audio_url: args.audioUrl },
+    { timeoutMs: TIMEOUTS.video, ...opts },
+  )
   return { url: data.video.url }
 }
