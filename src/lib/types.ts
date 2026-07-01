@@ -9,6 +9,15 @@ export interface Voice {
   createdAt: number
 }
 
+/** A reusable character reference image, hosted on the fal CDN. */
+export interface CharacterImage {
+  id: string
+  name: string
+  url: string
+  source: 'minted' | 'uploaded'
+  createdAt: number
+}
+
 /** A character the LLM plans for the scene (before its voice is minted). */
 export interface Character {
   name: string
@@ -16,6 +25,8 @@ export interface Character {
   voiceSpec: string
   /** ~55-70 word one-mood T2A monologue used to mint the reference clip. */
   refPrompt: string
+  /** Optional visual description used to mint the character reference image. */
+  appearance?: string
 }
 
 /** One generatable unit: a single seed-audio call. */
@@ -27,6 +38,8 @@ export interface Scene {
   speakers: string[]
   /** Full seed-audio prompt (already tagged + SFX/atmosphere baked in). */
   prompt: string
+  /** Optional shot/camera description for the scene keyframe + video. */
+  visual?: string
 }
 
 export interface Plan {
@@ -50,6 +63,10 @@ export interface Clip {
   status: ClipStatus
   phase?: 'queued' | 'running' | 'done'
   error?: string
+  imageUrl?: string
+  videoUrl?: string
+  videoStatus?: ClipStatus
+  videoPhase?: 'queued' | 'running' | 'done'
 }
 
 export type StudioStatus = 'idle' | 'planning' | 'generating' | 'done' | 'error'
@@ -62,4 +79,6 @@ export interface Brief {
   genre: string
   /** Library voice ids the user pinned as reference samples for this generation. */
   voiceIds: string[]
+  /** When true, also generate a keyframe image + kling video per scene. */
+  withVideo: boolean
 }
