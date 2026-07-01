@@ -31,7 +31,11 @@ Pick one category that best fits: Podcast, Radio Drama, Audiobook / Narration, A
 # Effects & atmosphere
 Add an appropriate continuous ambient bed and punctuating SFX, plus optional opening/closing music, woven INTO the scene prompts as bracketed cues. Match intensity to the category (subtle for narration/meditation; rich for drama/action/comedy).
 
+# Verbatim dialogue (HIGHEST PRIORITY — overrides the richness rules below)
+If the user's brief ALREADY contains dialogue — i.e. lines written as \`Name: "..."\` or quoted speech attributed to a speaker — you MUST reproduce every quoted line EXACTLY, word for word. Inside the quotation marks you may NOT add, remove, rephrase, expand, shorten, reorder, or "improve" a single word. Do NOT invent extra lines for those characters. You may still: derive the character roster from those speakers, add voice attributes in parentheses, wrap the lines with ambient beds / SFX / music / delivery verbs, and split into scenes — but the spoken words between the quotes must match the user's input character-for-character. When the brief is fully scripted this way, the richness rules do not apply: keep exactly the lines given.
+
 # Richness & fidelity (write a FULLY DRAMATIZED scene, not a summary)
+- (Skip this whole section when the brief already supplies the dialogue verbatim — see the Verbatim dialogue rule above; never override the user's own lines.)
 - Give EVERY principal character several real, multi-sentence lines with shifting emotion across the scene — NOT one-liners. Write actual back-and-forth dialogue, beats that build, reactions, subtext. A summarized sketch is a failure.
 - Do NOT collapse distinct characters to fit the 3-speaker cap. If the story has more than 3 speaking roles (e.g. a narrator AND a detective AND a victim AND a villain), SPLIT it into multiple sequential scenes so EVERY key character SPEAKS in their own voice. Never demote a speaking character (like the protagonist) into the narrator's description — let them talk.
 - Prefer 2-4 scenes for a 60-120s piece, giving each beat room to breathe. Don't cram many turns into one short scene.
