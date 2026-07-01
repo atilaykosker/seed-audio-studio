@@ -12,16 +12,20 @@ function GithubMark() {
 import { Badge, Card, CardContent, Separator } from '@/components/ui'
 import { BriefForm } from '@/components/BriefForm'
 import { VoiceLibraryPanel } from '@/components/VoiceLibraryPanel'
+import { CharacterLibraryPanel } from '@/components/CharacterLibraryPanel'
 import { ClipCard } from '@/components/ClipCard'
 import { Hero, HowItWorks, Features, UseCases, FAQ, SiteFooter } from '@/components/Marketing'
 import { Examples } from '@/components/Examples'
 import { useStore } from '@/store/useStore'
+import { estimatePlanCost, formatUSD } from '@/lib/cost'
 
 export function Studio() {
   const status = useStore((s) => s.status)
   const currentStep = useStore((s) => s.currentStep)
   const category = useStore((s) => s.category)
   const clips = useStore((s) => s.clips)
+  const plan = useStore((s) => s.plan)
+  const brief = useStore((s) => s.brief)
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -57,8 +61,9 @@ export function Studio() {
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-5">
+            <CardContent className="pt-5 space-y-5">
               <VoiceLibraryPanel />
+              <CharacterLibraryPanel />
             </CardContent>
           </Card>
         </div>
@@ -74,6 +79,11 @@ export function Studio() {
               <span className="text-muted-foreground">
                 {currentStep ?? (status === 'done' ? 'Done.' : status === 'error' ? 'Failed.' : '')}
               </span>
+              {plan && (
+                <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
+                  Est. cost: {formatUSD(estimatePlanCost(plan, brief.durationSec, brief.withVideo))}
+                </span>
+              )}
             </div>
           )}
 

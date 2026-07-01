@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Download, RefreshCw, ChevronDown, Loader2, AlertCircle } from 'lucide-react'
 import { Badge, Button, Card, CardContent } from '@/components/ui'
 import { useStore } from '@/store/useStore'
@@ -9,6 +9,18 @@ export function ClipCard({ clip }: { clip: Clip }) {
   const regen = useStore((s) => s.regenScene)
   const [showPrompt, setShowPrompt] = useState(false)
   const busy = clip.status === 'running'
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  const syncPlay = () => {
+    videoRef.current?.play()
+  }
+  const syncPause = () => {
+    videoRef.current?.pause()
+  }
+  const syncSeek = () => {
+    if (videoRef.current && audioRef.current) videoRef.current.currentTime = audioRef.current.currentTime
+  }
 
   return (
     <Card>
@@ -28,8 +40,28 @@ export function ClipCard({ clip }: { clip: Clip }) {
           </div>
         </div>
 
+        {clip.status === 'done' && clip.url && clip.videoUrl && (
+          <video
+            ref={videoRef}
+            src={clip.videoUrl}
+            muted
+            loop
+            playsInline
+            preload="none"
+            className="w-full rounded-md border border-border/60"
+          />
+        )}
         {clip.status === 'done' && clip.url && (
-          <audio controls preload="none" src={clip.url} className="w-full" />
+          <audio
+            ref={audioRef}
+            controls
+            preload="none"
+            src={clip.url}
+            className="w-full"
+            onPlay={syncPlay}
+            onPause={syncPause}
+            onSeeked={syncSeek}
+          />
         )}
         {busy && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -42,6 +74,23 @@ export function ClipCard({ clip }: { clip: Clip }) {
           <div className="flex items-start gap-2 text-sm text-destructive">
             <AlertCircle className="size-4 mt-0.5 shrink-0" />
             <span>{clip.error}</span>
+          </div>
+        )}
+        {clip.videoStatus && clip.videoStatus !== 'done' && (
+          <div
+            className={
+              'flex items-center gap-2 text-xs ' +
+              (clip.videoStatus === 'error' ? 'text-destructive' : 'text-muted-foreground')
+            }
+          >
+            {clip.videoStatus === 'error' ? (
+              <AlertCircle className="size-3.5 shrink-0" />
+            ) : (
+              <Loader2 className="size-3.5 animate-spin shrink-0" />
+            )}
+            {clip.videoStatus === 'error'
+              ? 'video: error'
+              : `video: ${clip.videoPhase === 'queued' ? 'queued…' : 'generating…'}`}
           </div>
         )}
 
