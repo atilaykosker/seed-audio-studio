@@ -18,6 +18,16 @@ export interface FriendlyError {
 
 /** Translate any thrown fal error into a user-facing, actionable message. */
 export function mapFalError(e: unknown): FriendlyError {
+  // Timeout / abort — a stalled queue job or a user cancel. Retryable.
+  if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError' || /\btimed out\b/i.test(e.message))) {
+    return {
+      kind: 'network',
+      title: 'Request timed out',
+      message: 'fal took too long to respond (a stalled job). Please retry — if it repeats, try a different LLM model in Settings.',
+      retryable: true,
+    }
+  }
+
   if (e instanceof ValidationError) {
     const detail = e.fieldErrors?.map((f) => f.msg).join('; ') || e.message
     const isSafety = /safety|nsfw|moderat|blocked/i.test(detail)

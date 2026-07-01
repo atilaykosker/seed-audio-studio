@@ -9,7 +9,7 @@ vi.mock('@fal-ai/client', () => ({
 }))
 
 import { fal } from '@fal-ai/client'
-import { nanoBanana, klingVideo, ENDPOINTS } from './client'
+import { nanoBanana, klingVideo, run, TimeoutError, ENDPOINTS } from './client'
 
 const subscribe = fal.subscribe as ReturnType<typeof vi.fn>
 
@@ -72,5 +72,44 @@ describe('klingVideo', () => {
     const cfg = subscribe.mock.calls[0][1]
     expect(cfg.input.elements).toBeUndefined()
     expect(cfg.input.duration).toBe('3') // clamped up to min 3
+  })
+})
+
+describe('run timeout/abort', () => {
+  it('passes an abortSignal to subscribe', async () => {
+    subscribe.mockResolvedValue({ data: {}, requestId: 'r' })
+    await run('ep', {})
+    const cfg = subscribe.mock.calls[0][1]
+    expect(cfg.abortSignal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('rejects with TimeoutError when the request exceeds timeoutMs', async () => {
+    vi.useFakeTimers()
+    // Mimic the real client: hang until the abortSignal fires, then reject.
+    // (vitest may invoke the mock once more during cleanup with no config — settle those.)
+    subscribe.mockImplementation((_ep: string, cfg?: { abortSignal: AbortSignal }) => {
+      if (!cfg?.abortSignal) return Promise.resolve({ data: {}, requestId: 'cleanup' })
+      return new Promise((_resolve, reject) => {
+        cfg.abortSignal.addEventListener('abort', () => reject(new Error('The operation was aborted')))
+      })
+    })
+    const p = run('ep', {}, { timeoutMs: 1000 })
+    const assertion = expect(p).rejects.toBeInstanceOf(TimeoutError)
+    await vi.advanceTimersByTimeAsync(1001)
+    await assertion
+    vi.useRealTimers()
+  })
+
+  it('aborts (without wrapping as TimeoutError) when an external signal fires', async () => {
+    const ext = new AbortController()
+    subscribe.mockImplementation((_ep: string, cfg?: { abortSignal: AbortSignal }) => {
+      if (!cfg?.abortSignal) return Promise.resolve({ data: {}, requestId: 'cleanup' })
+      return new Promise((_resolve, reject) => {
+        cfg.abortSignal.addEventListener('abort', () => reject(new Error('aborted')))
+      })
+    })
+    const p = run('ep', {}, { signal: ext.signal })
+    ext.abort()
+    await expect(p).rejects.toThrow(/aborted/i)
   })
 })

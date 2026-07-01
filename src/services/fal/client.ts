@@ -15,8 +15,20 @@ export function isConfigured(): boolean {
 
 export type QueuePhase = 'queued' | 'running' | 'done'
 
+/** Thrown when a fal request exceeds its timeout (a stalled queue job). Retryable. */
+export class TimeoutError extends Error {
+  constructor(ms: number) {
+    super(`Request timed out after ${Math.round(ms / 1000)}s.`)
+    this.name = 'TimeoutError'
+  }
+}
+
 export interface RunOptions {
   onProgress?: (phase: QueuePhase, position?: number) => void
+  /** Abort the request (and stop polling) after this many ms. Omit for no timeout. */
+  timeoutMs?: number
+  /** External signal to cancel the request (e.g. a Stop button). */
+  signal?: AbortSignal
 }
 
 interface QueueUpdate {
@@ -30,17 +42,46 @@ export async function run<T = unknown>(
   input: Record<string, unknown>,
   opts: RunOptions = {},
 ): Promise<{ data: T; requestId: string }> {
-  const res = await fal.subscribe(endpointId, {
-    input,
-    logs: false,
-    onQueueUpdate: (u: QueueUpdate) => {
-      if (u.status === 'IN_QUEUE') opts.onProgress?.('queued', u.queue_position)
-      else if (u.status === 'IN_PROGRESS') opts.onProgress?.('running')
-      else if (u.status === 'COMPLETED') opts.onProgress?.('done')
-    },
-  })
-  return { data: res.data as T, requestId: res.requestId }
+  const controller = new AbortController()
+  // Chain an external cancel signal (Stop button) into our controller.
+  if (opts.signal) {
+    if (opts.signal.aborted) controller.abort()
+    else opts.signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+  const timer =
+    opts.timeoutMs != null
+      ? setTimeout(() => controller.abort(new TimeoutError(opts.timeoutMs!)), opts.timeoutMs)
+      : undefined
+  try {
+    const res = await fal.subscribe(endpointId, {
+      input,
+      logs: false,
+      abortSignal: controller.signal,
+      onQueueUpdate: (u: QueueUpdate) => {
+        if (u.status === 'IN_QUEUE') opts.onProgress?.('queued', u.queue_position)
+        else if (u.status === 'IN_PROGRESS') opts.onProgress?.('running')
+        else if (u.status === 'COMPLETED') opts.onProgress?.('done')
+      },
+    })
+    return { data: res.data as T, requestId: res.requestId }
+  } catch (e) {
+    // Distinguish a timeout-triggered abort from an external cancel or a real error.
+    if (controller.signal.aborted && opts.timeoutMs != null && !opts.signal?.aborted) {
+      throw new TimeoutError(opts.timeoutMs)
+    }
+    throw e
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
+
+/** Default timeouts (ms) per model — generous backstops above realistic durations. */
+export const TIMEOUTS = {
+  llm: 120_000, // plans ~23s observed; catch true stalls
+  seedAudio: 300_000,
+  image: 180_000,
+  video: 600_000, // kling video legitimately takes minutes
+} as const
 
 /** Upload a blob/file to fal's CDN, returning a hosted URL usable as model input. */
 export async function uploadAsset(blob: Blob): Promise<string> {
@@ -103,7 +144,7 @@ export async function llmText(
       ...(args.temperature != null ? { temperature: args.temperature } : {}),
       ...(args.maxTokens != null ? { max_tokens: args.maxTokens } : {}),
     },
-    opts,
+    { timeoutMs: TIMEOUTS.llm, ...opts },
   )
   if (data.error) throw new Error(data.error)
   return data.output
@@ -129,7 +170,7 @@ export async function seedAudio(
     output_format: args.outputFormat ?? 'wav',
   }
   if (args.audioUrls && args.audioUrls.length) input.audio_urls = args.audioUrls
-  const { data } = await run<SeedAudioOutput>(ENDPOINTS.seedAudio, input, opts)
+  const { data } = await run<SeedAudioOutput>(ENDPOINTS.seedAudio, input, { timeoutMs: TIMEOUTS.seedAudio, ...opts })
   return { url: data.audio.url, duration: data.audio.duration ?? 0 }
 }
 
@@ -147,7 +188,11 @@ export async function nanoBanana(
   const input: Record<string, unknown> = { prompt: args.prompt }
   if (args.aspectRatio) input.aspect_ratio = args.aspectRatio
   if (hasRefs) input.image_urls = args.imageUrls
-  const { data } = await run<NanoBananaOutput>(hasRefs ? ENDPOINTS.nanoBananaEdit : ENDPOINTS.nanoBanana, input, opts)
+  const { data } = await run<NanoBananaOutput>(
+    hasRefs ? ENDPOINTS.nanoBananaEdit : ENDPOINTS.nanoBanana,
+    input,
+    { timeoutMs: TIMEOUTS.image, ...opts },
+  )
   const url = data.images?.[0]?.url
   if (!url) throw new Error('nano-banana returned no image.')
   return { url }
@@ -175,6 +220,6 @@ export async function klingVideo(
     generate_audio: false,
   }
   if (args.elements && args.elements.length) input.elements = args.elements.slice(0, 3)
-  const { data } = await run<KlingVideoOutput>(ENDPOINTS.klingVideo, input, opts)
+  const { data } = await run<KlingVideoOutput>(ENDPOINTS.klingVideo, input, { timeoutMs: TIMEOUTS.video, ...opts })
   return { url: data.video.url }
 }
