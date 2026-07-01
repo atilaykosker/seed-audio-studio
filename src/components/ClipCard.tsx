@@ -40,30 +40,41 @@ export function ClipCard({ clip }: { clip: Clip }) {
           </div>
         </div>
 
-        {clip.status === 'done' && clip.url && clip.videoUrl && (
+        {clip.status === 'done' && clip.url && clip.lipsyncUrl && (
           <video
-            ref={videoRef}
-            src={clip.videoUrl}
-            poster={clip.imageUrl}
-            muted
-            loop
+            src={clip.lipsyncUrl}
+            controls
             playsInline
             preload="none"
             className="w-full rounded-md border border-border/60"
           />
         )}
-        {clip.status === 'done' && clip.url && (
-          <audio
-            ref={audioRef}
-            controls
-            preload="none"
-            src={clip.url}
-            className="w-full"
-            onPlay={syncPlay}
-            onPause={syncPause}
-            onSeeked={syncSeek}
-            onEnded={() => videoRef.current?.pause()}
-          />
+        {clip.status === 'done' && clip.url && !clip.lipsyncUrl && (
+          <>
+            {clip.videoUrl && (
+              <video
+                ref={videoRef}
+                src={clip.videoUrl}
+                poster={clip.imageUrl}
+                muted
+                loop
+                playsInline
+                preload="none"
+                className="w-full rounded-md border border-border/60"
+              />
+            )}
+            <audio
+              ref={audioRef}
+              controls
+              preload="none"
+              src={clip.url}
+              className="w-full"
+              onPlay={syncPlay}
+              onPause={syncPause}
+              onSeeked={syncSeek}
+              onEnded={() => videoRef.current?.pause()}
+            />
+          </>
         )}
         {busy && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -93,6 +104,23 @@ export function ClipCard({ clip }: { clip: Clip }) {
             {clip.videoStatus === 'error'
               ? 'video: error'
               : `video: ${clip.videoPhase === 'queued' ? 'queued…' : 'generating…'}`}
+          </div>
+        )}
+        {(clip.lipsyncStatus === 'running' || clip.lipsyncStatus === 'error') && (
+          <div
+            className={
+              'flex items-center gap-2 text-xs ' +
+              (clip.lipsyncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground')
+            }
+          >
+            {clip.lipsyncStatus === 'error' ? (
+              <AlertCircle className="size-3.5 shrink-0" />
+            ) : (
+              <Loader2 className="size-3.5 animate-spin shrink-0" />
+            )}
+            {clip.lipsyncStatus === 'error'
+              ? 'lip-sync: skipped'
+              : `lip-sync: ${clip.lipsyncPhase === 'queued' ? 'queued…' : 'running…'}`}
           </div>
         )}
 
