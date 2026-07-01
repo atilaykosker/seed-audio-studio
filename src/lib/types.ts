@@ -85,3 +85,15 @@ export interface Brief {
   /** When true, also generate a keyframe image + kling video per scene. */
   withVideo: boolean
 }
+
+/** A saved run: brief + plan + results, persisted in localStorage and listed in the sidebar. */
+export interface Session {
+  id: string
+  title: string
+  createdAt: number
+  updatedAt: number
+  brief: Brief
+  plan: Plan | null
+  category: string | null
+  clips: Clip[]
+}

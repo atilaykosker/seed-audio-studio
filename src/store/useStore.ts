@@ -1,16 +1,18 @@
 import { create } from 'zustand'
-import { uid } from '@/lib/utils'
+import { uid, sessionTitle } from '@/lib/utils'
 import { mapFalError } from '@/services/fal/errors'
 import { DEFAULT_MODEL } from '@/services/fal/client'
 import { makePlan } from '@/services/studio/plan'
 import { generateFromPlan, generateScene } from '@/services/studio/generate'
 import { sceneKeyframe } from '@/services/studio/image'
 import { generateSceneVideo, lipSyncScene } from '@/services/studio/video'
-import type { Brief, Clip, CharacterImage, Plan, StudioStatus, Voice } from '@/lib/types'
+import type { Brief, Clip, CharacterImage, Plan, Session, StudioStatus, Voice } from '@/lib/types'
 
 const LIB_KEY = 'seed-audio-studio:library'
 const MODEL_KEY = 'seed-audio-studio:model'
 const CHAR_KEY = 'seed-audio-studio:characters'
+const SESS_KEY = 'seed-audio-studio:sessions'
+const ACTIVE_KEY = 'seed-audio-studio:activeSession'
 
 export interface Toast {
   id: string
@@ -41,6 +43,17 @@ function saveCharacterLibrary(v: CharacterImage[]) {
   localStorage.setItem(CHAR_KEY, JSON.stringify(v))
 }
 
+function loadSessions(): Session[] {
+  try {
+    return JSON.parse(localStorage.getItem(SESS_KEY) ?? '[]') as Session[]
+  } catch {
+    return []
+  }
+}
+function saveSessions(v: Session[]) {
+  localStorage.setItem(SESS_KEY, JSON.stringify(v)) // may throw QuotaExceededError
+}
+
 const DEFAULT_BRIEF: Brief = {
   idea: '',
   durationSec: 40,
@@ -60,6 +73,9 @@ interface Store {
   brief: Brief
   library: Voice[]
   characterLibrary: CharacterImage[]
+
+  sessions: Session[]
+  activeSessionId: string | null
 
   plan: Plan | null
   category: string | null
@@ -84,6 +100,13 @@ interface Store {
   removeCharacterImage: (id: string) => void
   clearCharacterLibrary: () => void
 
+  beginSession: () => void
+  saveActiveSession: () => void
+  newSession: () => void
+  loadSession: (id: string) => void
+  renameSession: (id: string, title: string) => void
+  deleteSession: (id: string) => void
+
   clearResults: () => void
   runStudio: () => Promise<void>
   regenScene: (sceneId: string) => Promise<void>
@@ -98,6 +121,9 @@ export const useStore = create<Store>((set, get) => ({
   brief: DEFAULT_BRIEF,
   library: loadLibrary(),
   characterLibrary: loadCharacterLibrary(),
+
+  sessions: loadSessions(),
+  activeSessionId: localStorage.getItem(ACTIVE_KEY),
 
   plan: null,
   category: null,
@@ -149,6 +175,87 @@ export const useStore = create<Store>((set, get) => ({
     saveCharacterLibrary([])
     set({ characterLibrary: [] })
   },
+
+  beginSession: () => {
+    const s = get()
+    if (s.activeSessionId) return
+    const now = Date.now()
+    const sess: Session = {
+      id: uid(),
+      title: sessionTitle(s.brief.idea),
+      createdAt: now,
+      updatedAt: now,
+      brief: s.brief,
+      plan: null,
+      category: null,
+      clips: [],
+    }
+    const next = [sess, ...s.sessions]
+    try {
+      saveSessions(next)
+    } catch {
+      get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
+      return
+    }
+    localStorage.setItem(ACTIVE_KEY, sess.id)
+    set({ sessions: next, activeSessionId: sess.id })
+  },
+
+  saveActiveSession: () => {
+    const s = get()
+    if (!s.activeSessionId) return
+    const next = s.sessions.map((x) =>
+      x.id === s.activeSessionId
+        ? { ...x, brief: s.brief, plan: s.plan, category: s.category, clips: s.clips, updatedAt: Date.now() }
+        : x,
+    )
+    try {
+      saveSessions(next)
+    } catch {
+      get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
+      return
+    }
+    set({ sessions: next })
+  },
+
+  newSession: () => {
+    localStorage.removeItem(ACTIVE_KEY)
+    set({ activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, category: null, clips: [], status: 'idle', currentStep: null })
+  },
+
+  loadSession: (id) => {
+    const sess = get().sessions.find((x) => x.id === id)
+    if (!sess) return
+    localStorage.setItem(ACTIVE_KEY, id)
+    set({
+      activeSessionId: id,
+      brief: sess.brief,
+      plan: sess.plan,
+      category: sess.category,
+      clips: sess.clips,
+      status: sess.clips.length ? 'done' : 'idle',
+      currentStep: null,
+    })
+  },
+
+  renameSession: (id, title) =>
+    set((s) => {
+      const t = title.trim() || 'Untitled'
+      const next = s.sessions.map((x) => (x.id === id ? { ...x, title: t, updatedAt: Date.now() } : x))
+      saveSessions(next)
+      return { sessions: next }
+    }),
+
+  deleteSession: (id) =>
+    set((s) => {
+      const next = s.sessions.filter((x) => x.id !== id)
+      saveSessions(next)
+      if (s.activeSessionId === id) {
+        localStorage.removeItem(ACTIVE_KEY)
+        return { sessions: next, activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, category: null, clips: [], status: 'idle', currentStep: null }
+      }
+      return { sessions: next }
+    }),
 
   clearResults: () => set({ plan: null, category: null, clips: [], status: 'idle', currentStep: null }),
 
