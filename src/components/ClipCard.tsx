@@ -8,6 +8,7 @@ import type { Clip } from '@/lib/types'
 export function ClipCard({ clip }: { clip: Clip }) {
   const regen = useStore((s) => s.regenScene)
   const [showPrompt, setShowPrompt] = useState(false)
+  const [mediaError, setMediaError] = useState(false)
   const busy = clip.status === 'running'
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -48,6 +49,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
             preload="none"
             poster={clip.imageUrl}
             className="w-full rounded-md border border-border/60"
+            onError={() => setMediaError(true)}
           />
         )}
         {clip.status === 'done' && clip.url && !clip.lipsyncUrl && (
@@ -62,6 +64,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
                 playsInline
                 preload="none"
                 className="w-full rounded-md border border-border/60"
+                onError={() => setMediaError(true)}
               />
             )}
             <audio
@@ -74,8 +77,12 @@ export function ClipCard({ clip }: { clip: Clip }) {
               onPause={syncPause}
               onSeeked={syncSeek}
               onEnded={() => videoRef.current?.pause()}
+              onError={() => setMediaError(true)}
             />
           </>
+        )}
+        {mediaError && (
+          <p className="text-xs text-muted-foreground">media link expired — regenerate this clip</p>
         )}
         {busy && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
