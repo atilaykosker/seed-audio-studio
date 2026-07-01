@@ -248,6 +248,9 @@ export const useStore = create<Store>((set, get) => ({
       videoUrl: undefined,
       videoStatus: undefined,
       videoPhase: undefined,
+      lipsyncUrl: undefined,
+      lipsyncStatus: undefined,
+      lipsyncPhase: undefined,
     })
     try {
       const r = await generateScene(scene, urlByName, {

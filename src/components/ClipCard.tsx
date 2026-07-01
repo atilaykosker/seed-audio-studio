@@ -46,6 +46,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
             controls
             playsInline
             preload="none"
+            poster={clip.imageUrl}
             className="w-full rounded-md border border-border/60"
           />
         )}
@@ -129,7 +130,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
             <ChevronDown className={`size-4 transition-transform ${showPrompt ? 'rotate-180' : ''}`} /> Prompt
           </Button>
           {clip.url && (
-            <a href={clip.url} download={`${clip.title.replace(/\s+/g, '_')}.wav`}>
+            <a href={clip.lipsyncUrl ?? clip.url} download={`${clip.title.replace(/\s+/g, '_')}.wav`}>
               <Button variant="ghost" size="sm">
                 <Download className="size-4" /> Download
               </Button>
