@@ -132,15 +132,14 @@ export async function generateFromPlan(
     if (withVideo) {
       cb.onSceneVideoStart?.(scene.id)
       try {
-        // Preserve index alignment with scene.speakers so @ElementN maps to the right character.
+        // Aligned to scene.speakers (undefined where a speaker has no image, e.g. a narrator).
+        // generateSceneVideo drops the imageless speakers and renumbers @ElementN accordingly,
+        // so on-screen characters stay consistent even when a narrator shares the scene.
         const mappedImages = scene.speakers.map((n) => imageByName.get(n.toLowerCase()))
         const presentImages = mappedImages.filter((u): u is string => !!u)
         const keyframe = await sceneKeyframe(scene, presentImages)
         cb.onKeyframe?.(scene.id, keyframe)
-        // Only pass @Element refs when every present speaker resolved to an image; a gap would
-        // misalign @ElementN against the wrong character, so fall back to keyframe-only video.
-        const elementImages = presentImages.length > 0 && mappedImages.every((u) => !!u) ? presentImages : []
-        const v = await generateSceneVideo(scene, keyframe, elementImages, durationSec, (p) =>
+        const v = await generateSceneVideo(scene, keyframe, mappedImages, durationSec, (p) =>
           cb.onSceneVideoPhase?.(scene.id, p),
         )
         cb.onSceneVideo?.(scene.id, v.url)

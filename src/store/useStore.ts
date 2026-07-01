@@ -251,13 +251,13 @@ export const useStore = create<Store>((set, get) => ({
         try {
           const imageByName = new Map<string, string>()
           for (const img of characterLibrary) imageByName.set(img.name.toLowerCase(), img.url)
-          // Preserve index alignment with scene.speakers, same rule as the main pipeline.
+          // Aligned to scene.speakers (undefined for imageless speakers like a narrator);
+          // generateSceneVideo drops them and renumbers @ElementN. Same rule as the main pipeline.
           const mappedImages = scene.speakers.map((n) => imageByName.get(n.toLowerCase()))
           const presentImages = mappedImages.filter((u): u is string => !!u)
           const keyframe = await sceneKeyframe(scene, presentImages)
           patch({ imageUrl: keyframe })
-          const elementImages = presentImages.length > 0 && mappedImages.every((u) => !!u) ? presentImages : []
-          const v = await generateSceneVideo(scene, keyframe, elementImages, r.durationSec || 10, (phase) =>
+          const v = await generateSceneVideo(scene, keyframe, mappedImages, r.durationSec || 10, (phase) =>
             patch({ videoPhase: phase }),
           )
           patch({ videoStatus: 'done', videoUrl: v.url })

@@ -70,7 +70,7 @@ describe('generateFromPlan (video mode)', () => {
     expect(onError).toHaveBeenCalledWith(expect.stringContaining('video:sc1'), expect.any(String))
   })
 
-  it('passes empty elements when a middle speaker image is missing, to avoid misaligned @ElementN refs', async () => {
+  it('passes a speaker-aligned image array (gap for a missing/narrator speaker) to the video step', async () => {
     const twoSpeakerPlan: Plan = {
       category: 'Drama',
       characters: [
@@ -90,6 +90,14 @@ describe('generateFromPlan (video mode)', () => {
     )
 
     expect(sceneKeyframe).toHaveBeenCalledWith(twoSpeakerPlan.scenes[0], ['https://charB'])
-    expect(generateSceneVideo).toHaveBeenCalledWith(twoSpeakerPlan.scenes[0], 'https://key', [], 9, expect.any(Function))
+    // Aligned to speakers [A, B]: A's image is missing (undefined), B resolved.
+    // generateSceneVideo renumbers @ElementN and drops the gap internally.
+    expect(generateSceneVideo).toHaveBeenCalledWith(
+      twoSpeakerPlan.scenes[0],
+      'https://key',
+      [undefined, 'https://charB'],
+      9,
+      expect.any(Function),
+    )
   })
 })
