@@ -154,6 +154,26 @@ export interface SeedAudioOutput {
   audio: { url: string; duration?: number; content_type?: string }
 }
 
+/** seed-audio rejects a `prompt` longer than this many characters (HTTP 422). */
+export const SEED_AUDIO_MAX_PROMPT = 2048
+
+/**
+ * Trim a prompt to at most `max` chars, cutting at the last sentence end (or space)
+ * so an over-long LLM scene still renders instead of failing the 2048-char limit.
+ */
+export function clampPrompt(prompt: string, max = SEED_AUDIO_MAX_PROMPT): string {
+  if (prompt.length <= max) return prompt
+  const slice = prompt.slice(0, max)
+  const sentence = Math.max(
+    slice.lastIndexOf('." '),
+    slice.lastIndexOf('. '),
+    slice.lastIndexOf('! '),
+    slice.lastIndexOf('? '),
+  )
+  const boundary = sentence > max * 0.5 ? sentence + 1 : slice.lastIndexOf(' ')
+  return (boundary > 0 ? slice.slice(0, boundary) : slice).trim()
+}
+
 /** Generate one seed-audio clip. T2A (no refs) or TA2A (audio_urls ≤3, referenced @Audio1..3). */
 export async function seedAudio(
   args: {
@@ -164,8 +184,12 @@ export async function seedAudio(
   },
   opts: RunOptions = {},
 ): Promise<{ url: string; duration: number }> {
+  const prompt = clampPrompt(args.prompt)
+  if (prompt.length < args.prompt.length) {
+    console.warn(`seed-audio prompt trimmed from ${args.prompt.length} to ${prompt.length} chars (2048 limit).`)
+  }
   const input: Record<string, unknown> = {
-    prompt: args.prompt,
+    prompt,
     sample_rate: args.sampleRate ?? 44100,
     output_format: args.outputFormat ?? 'wav',
   }

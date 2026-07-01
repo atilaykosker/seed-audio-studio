@@ -9,7 +9,7 @@ vi.mock('@fal-ai/client', () => ({
 }))
 
 import { fal } from '@fal-ai/client'
-import { nanoBanana, klingVideo, run, TimeoutError, ENDPOINTS } from './client'
+import { nanoBanana, klingVideo, seedAudio, clampPrompt, run, TimeoutError, ENDPOINTS, SEED_AUDIO_MAX_PROMPT } from './client'
 
 const subscribe = fal.subscribe as ReturnType<typeof vi.fn>
 
@@ -72,6 +72,33 @@ describe('klingVideo', () => {
     const cfg = subscribe.mock.calls[0][1]
     expect(cfg.input.elements).toBeUndefined()
     expect(cfg.input.duration).toBe('3') // clamped up to min 3
+  })
+})
+
+describe('clampPrompt', () => {
+  it('leaves a short prompt untouched', () => {
+    expect(clampPrompt('hello', 2048)).toBe('hello')
+  })
+
+  it('never exceeds the max length', () => {
+    const long = 'word '.repeat(1000) // 5000 chars
+    expect(clampPrompt(long, SEED_AUDIO_MAX_PROMPT).length).toBeLessThanOrEqual(SEED_AUDIO_MAX_PROMPT)
+  })
+
+  it('prefers a sentence boundary when one is available', () => {
+    const p = 'A'.repeat(1990) + '. ' + 'B'.repeat(200) // sentence end near 1992
+    const out = clampPrompt(p, 2048)
+    expect(out.endsWith('.')).toBe(true)
+    expect(out).not.toContain('B')
+  })
+})
+
+describe('seedAudio prompt clamping', () => {
+  it('sends a prompt no longer than the 2048-char limit', async () => {
+    subscribe.mockResolvedValue({ data: { audio: { url: 'https://a', duration: 5 } }, requestId: 'r' })
+    await seedAudio({ prompt: 'x '.repeat(2000) }) // 4000 chars
+    const cfg = subscribe.mock.calls[0][1]
+    expect(cfg.input.prompt.length).toBeLessThanOrEqual(SEED_AUDIO_MAX_PROMPT)
   })
 })
 

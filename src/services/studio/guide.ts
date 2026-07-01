@@ -21,7 +21,7 @@ export const SEED_AUDIO_GUIDE = `You are a senior audio director for ByteDance S
 - NEVER use negations ("no Chinese accent", "not robotic", "never monotone") — they backfire. Describe positively: "warm natural conversational voice".
 
 # Hard limits (must respect)
-- Each scene prompt text <= 2000 characters; each scene's audio output <= ~2 minutes.
+- Each scene "prompt" MUST be <= 2000 characters. This is a HARD API limit — a longer prompt is REJECTED. Never write one giant "complete story" scene; if the content is long, SPLIT it into multiple sequential scenes, each well under 2000 characters. Each scene's audio output <= ~2 minutes.
 - A TA2A scene may reference AT MOST 3 distinct speakers (@Audio1..3). If the story needs more characters or is longer than ~90 seconds, SPLIT it into multiple sequential scenes, each with <=3 speakers. A narrator that appears throughout counts as one of the 3 per scene.
 - Language: English or Chinese only.
 
