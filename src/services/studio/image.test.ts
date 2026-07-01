@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/services/fal/client', () => ({
-  nanoBanana: vi.fn()
-}))
+const { nanoBanana } = vi.hoisted(() => {
+  return { nanoBanana: vi.fn() }
+})
+
+vi.mock('@/services/fal/client', () => ({ nanoBanana }))
 
 import { mintCharacterImage, sceneKeyframe, buildCharacterImagePrompt } from './image'
-import { nanoBanana } from '@/services/fal/client'
 import type { Character, Scene } from '@/lib/types'
 
 beforeEach(() => nanoBanana.mockReset())
