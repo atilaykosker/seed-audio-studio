@@ -14,6 +14,7 @@ import {
   klingVideo,
   seedAudio,
   latentSync,
+  mergeAudioVideo,
   clampPrompt,
   stripInvalidElementRefs,
   run,
@@ -181,6 +182,17 @@ describe('latentSync', () => {
     expect(r.url).toBe('https://combined/1')
     const [endpoint, cfg] = subscribe.mock.calls[0]
     expect(endpoint).toBe(ENDPOINTS.latentSync)
+    expect(cfg.input).toEqual({ video_url: 'https://vid', audio_url: 'https://aud' })
+  })
+})
+
+describe('mergeAudioVideo', () => {
+  it('sends video_url + audio_url to the ffmpeg mux endpoint and returns the merged url', async () => {
+    subscribe.mockResolvedValue({ data: { video: { url: 'https://muxed/1' } }, requestId: 'r' })
+    const r = await mergeAudioVideo({ videoUrl: 'https://vid', audioUrl: 'https://aud' })
+    expect(r.url).toBe('https://muxed/1')
+    const [endpoint, cfg] = subscribe.mock.calls[0]
+    expect(endpoint).toBe(ENDPOINTS.mergeAudioVideo)
     expect(cfg.input).toEqual({ video_url: 'https://vid', audio_url: 'https://aud' })
   })
 })

@@ -1,4 +1,4 @@
-import { klingVideo, latentSync, type KlingElement, type QueuePhase } from '@/services/fal/client'
+import { klingVideo, latentSync, mergeAudioVideo, type KlingElement, type QueuePhase } from '@/services/fal/client'
 import type { Scene } from '@/lib/types'
 
 /**
@@ -50,11 +50,21 @@ export async function generateSceneVideo(
   )
 }
 
-/** Fuse a scene's silent video + its audio into one lip-synced clip (audio embedded). */
+/**
+ * Fuse a scene's silent video + its audio into ONE combined clip. Tries LatentSync (real
+ * lip-sync) first; if it fails — most often a `face_detection_error` on stylized/animal or
+ * faceless (narrator) shots — falls back to a plain ffmpeg mux so we still return a single
+ * combined file (with kling's own generic mouth motion) instead of separate video + audio.
+ */
 export async function lipSyncScene(
   videoUrl: string,
   audioUrl: string,
   onPhase?: (p: QueuePhase) => void,
 ): Promise<{ url: string }> {
-  return latentSync({ videoUrl, audioUrl }, onPhase ? { onProgress: onPhase } : {})
+  const opts = onPhase ? { onProgress: onPhase } : {}
+  try {
+    return await latentSync({ videoUrl, audioUrl }, opts)
+  } catch {
+    return mergeAudioVideo({ videoUrl, audioUrl }, opts)
+  }
 }

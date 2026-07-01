@@ -101,6 +101,8 @@ export const ENDPOINTS = {
   klingVideo: 'fal-ai/kling-video/v3/pro/image-to-video',
   /** Lip-sync / dubbing: fuse a video + audio into one lip-synced clip. */
   latentSync: 'fal-ai/latentsync',
+  /** Plain A/V mux (ffmpeg): merge a video + audio into one clip, no face detection. */
+  mergeAudioVideo: 'fal-ai/ffmpeg-api/merge-audio-video',
 } as const
 
 export interface ModelOption {
@@ -282,6 +284,23 @@ export async function latentSync(
 ): Promise<{ url: string }> {
   const { data } = await run<LatentSyncOutput>(
     ENDPOINTS.latentSync,
+    { video_url: args.videoUrl, audio_url: args.audioUrl },
+    { timeoutMs: TIMEOUTS.video, ...opts },
+  )
+  return { url: data.video.url }
+}
+
+interface MergeAudioVideoOutput {
+  video: { url: string; content_type?: string; file_name?: string; file_size?: number }
+}
+
+/** Merge a video + audio into one clip via ffmpeg — no face detection, always succeeds. */
+export async function mergeAudioVideo(
+  args: { videoUrl: string; audioUrl: string },
+  opts: RunOptions = {},
+): Promise<{ url: string }> {
+  const { data } = await run<MergeAudioVideoOutput>(
+    ENDPOINTS.mergeAudioVideo,
     { video_url: args.videoUrl, audio_url: args.audioUrl },
     { timeoutMs: TIMEOUTS.video, ...opts },
   )

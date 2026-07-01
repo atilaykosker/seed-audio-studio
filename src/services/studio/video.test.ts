@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { klingVideo, latentSync } = vi.hoisted(() => {
-  return { klingVideo: vi.fn(), latentSync: vi.fn() }
+const { klingVideo, latentSync, mergeAudioVideo } = vi.hoisted(() => {
+  return { klingVideo: vi.fn(), latentSync: vi.fn(), mergeAudioVideo: vi.fn() }
 })
 
-vi.mock('@/services/fal/client', () => ({ klingVideo, latentSync }))
+vi.mock('@/services/fal/client', () => ({ klingVideo, latentSync, mergeAudioVideo }))
 
 import { generateSceneVideo, buildElementPrompt, lipSyncScene } from './video'
 import type { Scene } from '@/lib/types'
@@ -12,6 +12,7 @@ import type { Scene } from '@/lib/types'
 beforeEach(() => {
   klingVideo.mockReset()
   latentSync.mockReset()
+  mergeAudioVideo.mockReset()
 })
 
 const scene: Scene = { id: '1', kind: 'TA2A', title: 't', speakers: ['A', 'B'], prompt: 'p', visual: '@Element1 and @Element2 talk' }
@@ -77,5 +78,14 @@ describe('lipSyncScene', () => {
     const [args, opts] = latentSync.mock.calls[0]
     expect(args).toEqual({ videoUrl: 'https://vid', audioUrl: 'https://aud' })
     expect(typeof opts.onProgress).toBe('function')
+    expect(mergeAudioVideo).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a plain mux when lip-sync fails (e.g. no face detected)', async () => {
+    latentSync.mockRejectedValue(new Error('face_detection_error'))
+    mergeAudioVideo.mockResolvedValue({ url: 'https://muxed' })
+    const r = await lipSyncScene('https://vid', 'https://aud')
+    expect(r.url).toBe('https://muxed')
+    expect(mergeAudioVideo).toHaveBeenCalledWith({ videoUrl: 'https://vid', audioUrl: 'https://aud' }, {})
   })
 })
