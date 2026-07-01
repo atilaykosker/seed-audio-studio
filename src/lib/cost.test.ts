@@ -20,10 +20,11 @@ describe('estimatePlanCost', () => {
     expect(estimatePlanCost(plan, 40)).toBeCloseTo((130 / 60) * 0.1875, 5)
   })
 
-  it('adds nano-banana (per char + per scene) and kling seconds when withVideo', () => {
+  it('adds nano-banana (per char + per scene), kling seconds, and lip-sync when withVideo', () => {
     const audio = (130 / 60) * 0.1875
     const images = (2 + 2) * 0.039 // 2 char images + 2 scene keyframes
     const video = 2 * 10 * 0.112 // 2 scenes * 10s * $/s
-    expect(estimatePlanCost(plan, 40, true)).toBeCloseTo(audio + images + video, 5)
+    const lipsync = 2 * 0.2 // 2 scenes * $0.20 LatentSync
+    expect(estimatePlanCost(plan, 40, true)).toBeCloseTo(audio + images + video + lipsync, 5)
   })
 })

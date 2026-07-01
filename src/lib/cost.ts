@@ -8,6 +8,8 @@ const IMAGE_EACH = 0.039
 const VIDEO_PER_SEC = 0.112
 /** Assumed kling clip length used for pre-generation estimates. */
 const VIDEO_SEC = 10
+/** LatentSync lip-sync price: ~$0.20 flat per clip (<=40s). */
+const LIPSYNC_EACH = 0.2
 
 /** Rough cost estimate for a plan: mint clips (~25s each) + scene clips, plus images+video when withVideo. */
 export function estimatePlanCost(plan: Plan, targetDurationSec: number, withVideo = false): number {
@@ -17,7 +19,8 @@ export function estimatePlanCost(plan: Plan, targetDurationSec: number, withVide
   if (!withVideo) return audio
   const images = (plan.characters.length + plan.scenes.length) * IMAGE_EACH
   const video = plan.scenes.length * VIDEO_SEC * VIDEO_PER_SEC
-  return audio + images + video
+  const lipsync = plan.scenes.length * LIPSYNC_EACH
+  return audio + images + video + lipsync
 }
 
 /** Cost of a single generated clip given its duration in seconds. */

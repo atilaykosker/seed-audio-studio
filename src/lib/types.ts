@@ -67,6 +67,9 @@ export interface Clip {
   videoUrl?: string
   videoStatus?: ClipStatus
   videoPhase?: 'queued' | 'running' | 'done'
+  lipsyncUrl?: string
+  lipsyncStatus?: ClipStatus
+  lipsyncPhase?: 'queued' | 'running' | 'done'
 }
 
 export type StudioStatus = 'idle' | 'planning' | 'generating' | 'done' | 'error'
