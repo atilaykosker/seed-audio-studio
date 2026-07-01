@@ -5,7 +5,7 @@ import { DEFAULT_MODEL } from '@/services/fal/client'
 import { makePlan } from '@/services/studio/plan'
 import { generateFromPlan, generateScene } from '@/services/studio/generate'
 import { sceneKeyframe } from '@/services/studio/image'
-import { generateSceneVideo } from '@/services/studio/video'
+import { generateSceneVideo, lipSyncScene } from '@/services/studio/video'
 import type { Brief, Clip, CharacterImage, Plan, StudioStatus, Voice } from '@/lib/types'
 
 const LIB_KEY = 'seed-audio-studio:library'
@@ -208,12 +208,21 @@ export const useStore = create<Store>((set, get) => ({
         },
         onSceneVideoPhase: (sceneId, phase) => patchClipByScene(sceneId, { videoPhase: phase }),
         onSceneVideo: (sceneId, url) => patchClipByScene(sceneId, { videoStatus: 'done', videoUrl: url }),
+        onLipSyncStart: (sceneId) => {
+          set({ currentStep: 'Lip-syncing…' })
+          patchClipByScene(sceneId, { lipsyncStatus: 'running' })
+        },
+        onLipSyncPhase: (sceneId, phase) => patchClipByScene(sceneId, { lipsyncPhase: phase }),
+        onLipSync: (sceneId, url) => patchClipByScene(sceneId, { lipsyncStatus: 'done', lipsyncUrl: url }),
         onError: (scope, message) => {
           if (scope.startsWith('scene:')) {
             patchClipByScene(scope.slice('scene:'.length), { status: 'error', error: message })
           } else if (scope.startsWith('video:')) {
             patchClipByScene(scope.slice('video:'.length), { videoStatus: 'error' })
             get().toast({ kind: 'error', title: 'Video issue', message })
+          } else if (scope.startsWith('lipsync:')) {
+            patchClipByScene(scope.slice('lipsync:'.length), { lipsyncStatus: 'error' })
+            get().toast({ kind: 'info', title: 'Lip-sync skipped', message: 'Playing video + audio separately for this clip.' })
           } else {
             get().toast({ kind: 'error', title: 'Generation issue', message })
           }
@@ -261,6 +270,14 @@ export const useStore = create<Store>((set, get) => ({
             patch({ videoPhase: phase }),
           )
           patch({ videoStatus: 'done', videoUrl: v.url })
+
+          patch({ lipsyncStatus: 'running', lipsyncUrl: undefined })
+          try {
+            const ls = await lipSyncScene(v.url, r.url, (phase) => patch({ lipsyncPhase: phase }))
+            patch({ lipsyncStatus: 'done', lipsyncUrl: ls.url })
+          } catch {
+            patch({ lipsyncStatus: 'error' })
+          }
         } catch (e) {
           const fe = mapFalError(e)
           patch({ videoStatus: 'error' })
