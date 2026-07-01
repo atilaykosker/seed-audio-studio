@@ -4,10 +4,11 @@ import { mapFalError } from '@/services/fal/errors'
 import { DEFAULT_MODEL } from '@/services/fal/client'
 import { makePlan } from '@/services/studio/plan'
 import { generateFromPlan, generateScene } from '@/services/studio/generate'
-import type { Brief, Clip, Plan, StudioStatus, Voice } from '@/lib/types'
+import type { Brief, Clip, CharacterImage, Plan, StudioStatus, Voice } from '@/lib/types'
 
 const LIB_KEY = 'seed-audio-studio:library'
 const MODEL_KEY = 'seed-audio-studio:model'
+const CHAR_KEY = 'seed-audio-studio:characters'
 
 export interface Toast {
   id: string
@@ -27,6 +28,17 @@ function saveLibrary(v: Voice[]) {
   localStorage.setItem(LIB_KEY, JSON.stringify(v))
 }
 
+function loadCharacterLibrary(): CharacterImage[] {
+  try {
+    return JSON.parse(localStorage.getItem(CHAR_KEY) ?? '[]') as CharacterImage[]
+  } catch {
+    return []
+  }
+}
+function saveCharacterLibrary(v: CharacterImage[]) {
+  localStorage.setItem(CHAR_KEY, JSON.stringify(v))
+}
+
 const DEFAULT_BRIEF: Brief = {
   idea: '',
   durationSec: 40,
@@ -34,6 +46,7 @@ const DEFAULT_BRIEF: Brief = {
   speakers: 'auto',
   genre: '',
   voiceIds: [],
+  withVideo: false,
 }
 
 interface Store {
@@ -44,6 +57,7 @@ interface Store {
   model: string
   brief: Brief
   library: Voice[]
+  characterLibrary: CharacterImage[]
 
   plan: Plan | null
   category: string | null
@@ -64,6 +78,10 @@ interface Store {
   removeVoice: (id: string) => void
   clearLibrary: () => void
 
+  addCharacterImage: (img: CharacterImage) => void
+  removeCharacterImage: (id: string) => void
+  clearCharacterLibrary: () => void
+
   clearResults: () => void
   runStudio: () => Promise<void>
   regenScene: (sceneId: string) => Promise<void>
@@ -77,6 +95,7 @@ export const useStore = create<Store>((set, get) => ({
   model: localStorage.getItem(MODEL_KEY) ?? DEFAULT_MODEL,
   brief: DEFAULT_BRIEF,
   library: loadLibrary(),
+  characterLibrary: loadCharacterLibrary(),
 
   plan: null,
   category: null,
@@ -110,6 +129,23 @@ export const useStore = create<Store>((set, get) => ({
   clearLibrary: () => {
     saveLibrary([])
     set({ library: [] })
+  },
+
+  addCharacterImage: (img) =>
+    set((s) => {
+      const next = [img, ...s.characterLibrary.filter((x) => x.id !== img.id)]
+      saveCharacterLibrary(next)
+      return { characterLibrary: next }
+    }),
+  removeCharacterImage: (id) =>
+    set((s) => {
+      const next = s.characterLibrary.filter((x) => x.id !== id)
+      saveCharacterLibrary(next)
+      return { characterLibrary: next }
+    }),
+  clearCharacterLibrary: () => {
+    saveCharacterLibrary([])
+    set({ characterLibrary: [] })
   },
 
   clearResults: () => set({ plan: null, category: null, clips: [], status: 'idle', currentStep: null }),
@@ -152,20 +188,30 @@ export const useStore = create<Store>((set, get) => ({
 
     await generateFromPlan(
       plan,
-      { library: get().library },
+      { library: get().library, characterLibrary: get().characterLibrary, withVideo: brief.withVideo },
       {
         onMintStart: (name) => set({ currentStep: `Minting voice: ${name}…` }),
         onVoice: (v) => get().addVoice(v),
+        onCharacterImage: (img) => get().addCharacterImage(img),
         onSceneStart: (sceneId) => {
           set({ currentStep: 'Generating audio…' })
           patchClipByScene(sceneId, { status: 'running' })
         },
         onScenePhase: (sceneId, phase) => patchClipByScene(sceneId, { phase }),
         onScene: (sceneId, r) => patchClipByScene(sceneId, { status: 'done', url: r.url, durationSec: r.durationSec }),
+        onKeyframe: (sceneId, url) => patchClipByScene(sceneId, { imageUrl: url }),
+        onSceneVideoStart: (sceneId) => {
+          set({ currentStep: 'Generating video…' })
+          patchClipByScene(sceneId, { videoStatus: 'running' })
+        },
+        onSceneVideoPhase: (sceneId, phase) => patchClipByScene(sceneId, { videoPhase: phase }),
+        onSceneVideo: (sceneId, url) => patchClipByScene(sceneId, { videoStatus: 'done', videoUrl: url }),
         onError: (scope, message) => {
           if (scope.startsWith('scene:')) {
-            const sceneId = scope.slice('scene:'.length)
-            patchClipByScene(sceneId, { status: 'error', error: message })
+            patchClipByScene(scope.slice('scene:'.length), { status: 'error', error: message })
+          } else if (scope.startsWith('video:')) {
+            patchClipByScene(scope.slice('video:'.length), { videoStatus: 'error' })
+            get().toast({ kind: 'error', title: 'Video issue', message })
           } else {
             get().toast({ kind: 'error', title: 'Generation issue', message })
           }
