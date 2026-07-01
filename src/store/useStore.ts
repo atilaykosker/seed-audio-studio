@@ -269,6 +269,7 @@ export const useStore = create<Store>((set, get) => ({
       get().toast({ kind: 'error', title: 'Add a brief', message: 'Describe the scene you want to generate.' })
       return
     }
+    get().beginSession()
     set({ status: 'planning', currentStep: 'Planning scene…', plan: null, clips: [] })
     const provided = get().library.filter((v) => brief.voiceIds.includes(v.id))
     let plan: Plan
@@ -291,6 +292,7 @@ export const useStore = create<Store>((set, get) => ({
       status: 'pending',
     }))
     set({ plan, category: plan.category, clips, status: 'generating' })
+    get().saveActiveSession()
 
     const patchClipByScene = (sceneId: string, patch: Partial<Clip>) =>
       set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...patch } : c)) }))
@@ -307,20 +309,29 @@ export const useStore = create<Store>((set, get) => ({
           patchClipByScene(sceneId, { status: 'running' })
         },
         onScenePhase: (sceneId, phase) => patchClipByScene(sceneId, { phase }),
-        onScene: (sceneId, r) => patchClipByScene(sceneId, { status: 'done', url: r.url, durationSec: r.durationSec }),
+        onScene: (sceneId, r) => {
+          patchClipByScene(sceneId, { status: 'done', url: r.url, durationSec: r.durationSec })
+          get().saveActiveSession()
+        },
         onKeyframe: (sceneId, url) => patchClipByScene(sceneId, { imageUrl: url }),
         onSceneVideoStart: (sceneId) => {
           set({ currentStep: 'Generating video…' })
           patchClipByScene(sceneId, { videoStatus: 'running' })
         },
         onSceneVideoPhase: (sceneId, phase) => patchClipByScene(sceneId, { videoPhase: phase }),
-        onSceneVideo: (sceneId, url) => patchClipByScene(sceneId, { videoStatus: 'done', videoUrl: url }),
+        onSceneVideo: (sceneId, url) => {
+          patchClipByScene(sceneId, { videoStatus: 'done', videoUrl: url })
+          get().saveActiveSession()
+        },
         onLipSyncStart: (sceneId) => {
           set({ currentStep: 'Lip-syncing…' })
           patchClipByScene(sceneId, { lipsyncStatus: 'running' })
         },
         onLipSyncPhase: (sceneId, phase) => patchClipByScene(sceneId, { lipsyncPhase: phase }),
-        onLipSync: (sceneId, url) => patchClipByScene(sceneId, { lipsyncStatus: 'done', lipsyncUrl: url }),
+        onLipSync: (sceneId, url) => {
+          patchClipByScene(sceneId, { lipsyncStatus: 'done', lipsyncUrl: url })
+          get().saveActiveSession()
+        },
         onError: (scope, message) => {
           if (scope.startsWith('scene:')) {
             patchClipByScene(scope.slice('scene:'.length), { status: 'error', error: message })
@@ -337,6 +348,7 @@ export const useStore = create<Store>((set, get) => ({
       },
     )
     set({ status: 'done', currentStep: null })
+    get().saveActiveSession()
   },
 
   regenScene: async (sceneId) => {
@@ -399,5 +411,6 @@ export const useStore = create<Store>((set, get) => ({
       patch({ status: 'error', error: fe.message })
       get().toast({ kind: 'error', title: fe.title, message: fe.message })
     }
+    get().saveActiveSession()
   },
 }))
