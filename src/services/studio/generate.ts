@@ -1,7 +1,7 @@
 import { seedAudio, uploadAsset, type QueuePhase } from '@/services/fal/client'
 import { fetchAndTrim } from '@/services/audio/trim'
 import { mintCharacterImage, sceneKeyframe } from './image'
-import { generateSceneVideo } from './video'
+import { generateSceneVideo, lipSyncScene } from './video'
 import { uid } from '@/lib/utils'
 import type { Character, CharacterImage, Plan, Scene, Voice } from '@/lib/types'
 
@@ -18,6 +18,9 @@ export interface GenerateCallbacks {
   onSceneVideoStart?: (sceneId: string) => void
   onSceneVideoPhase?: (sceneId: string, phase: QueuePhase) => void
   onSceneVideo?: (sceneId: string, url: string) => void
+  onLipSyncStart?: (sceneId: string) => void
+  onLipSyncPhase?: (sceneId: string, phase: QueuePhase) => void
+  onLipSync?: (sceneId: string, url: string) => void
 }
 
 /** Mint one character's reference voice: T2A → trim ≤28s → upload to fal CDN. */
@@ -121,30 +124,44 @@ export async function generateFromPlan(
   for (const scene of plan.scenes) {
     cb.onSceneStart?.(scene.id)
     let durationSec = 10
+    let audioUrl: string | undefined
     try {
       const r = await generateScene(scene, resolved, cb)
       durationSec = r.durationSec || 10
+      audioUrl = r.url
       cb.onScene?.(scene.id, r)
     } catch (e) {
       cb.onError?.(`scene:${scene.id}`, e instanceof Error ? e.message : String(e))
     }
 
-    if (withVideo) {
-      cb.onSceneVideoStart?.(scene.id)
+    if (!withVideo) continue
+
+    let videoUrl: string | undefined
+    cb.onSceneVideoStart?.(scene.id)
+    try {
+      // Aligned to scene.speakers (undefined where a speaker has no image, e.g. a narrator).
+      // generateSceneVideo drops the imageless speakers and renumbers @ElementN accordingly.
+      const mappedImages = scene.speakers.map((n) => imageByName.get(n.toLowerCase()))
+      const presentImages = mappedImages.filter((u): u is string => !!u)
+      const keyframe = await sceneKeyframe(scene, presentImages)
+      cb.onKeyframe?.(scene.id, keyframe)
+      const v = await generateSceneVideo(scene, keyframe, mappedImages, durationSec, (p) =>
+        cb.onSceneVideoPhase?.(scene.id, p),
+      )
+      videoUrl = v.url
+      cb.onSceneVideo?.(scene.id, v.url)
+    } catch (e) {
+      cb.onError?.(`video:${scene.id}`, e instanceof Error ? e.message : String(e))
+    }
+
+    // Fuse the video + audio into one lip-synced clip when both are available.
+    if (videoUrl && audioUrl) {
+      cb.onLipSyncStart?.(scene.id)
       try {
-        // Aligned to scene.speakers (undefined where a speaker has no image, e.g. a narrator).
-        // generateSceneVideo drops the imageless speakers and renumbers @ElementN accordingly,
-        // so on-screen characters stay consistent even when a narrator shares the scene.
-        const mappedImages = scene.speakers.map((n) => imageByName.get(n.toLowerCase()))
-        const presentImages = mappedImages.filter((u): u is string => !!u)
-        const keyframe = await sceneKeyframe(scene, presentImages)
-        cb.onKeyframe?.(scene.id, keyframe)
-        const v = await generateSceneVideo(scene, keyframe, mappedImages, durationSec, (p) =>
-          cb.onSceneVideoPhase?.(scene.id, p),
-        )
-        cb.onSceneVideo?.(scene.id, v.url)
+        const ls = await lipSyncScene(videoUrl, audioUrl, (p) => cb.onLipSyncPhase?.(scene.id, p))
+        cb.onLipSync?.(scene.id, ls.url)
       } catch (e) {
-        cb.onError?.(`video:${scene.id}`, e instanceof Error ? e.message : String(e))
+        cb.onError?.(`lipsync:${scene.id}`, e instanceof Error ? e.message : String(e))
       }
     }
   }

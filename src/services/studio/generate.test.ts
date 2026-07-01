@@ -7,14 +7,14 @@ vi.mock('@/services/audio/trim', () => ({ fetchAndTrim: vi.fn(async () => new Bl
 const { mintCharacterImage, sceneKeyframe } = vi.hoisted(() => ({ mintCharacterImage: vi.fn(), sceneKeyframe: vi.fn() }))
 vi.mock('./image', () => ({ mintCharacterImage, sceneKeyframe }))
 
-const { generateSceneVideo } = vi.hoisted(() => ({ generateSceneVideo: vi.fn() }))
-vi.mock('./video', () => ({ generateSceneVideo }))
+const { generateSceneVideo, lipSyncScene } = vi.hoisted(() => ({ generateSceneVideo: vi.fn(), lipSyncScene: vi.fn() }))
+vi.mock('./video', () => ({ generateSceneVideo, lipSyncScene }))
 
 import { generateFromPlan } from './generate'
 import type { Plan } from '@/lib/types'
 
 beforeEach(() => {
-  seedAudio.mockReset(); uploadAsset.mockReset(); mintCharacterImage.mockReset(); sceneKeyframe.mockReset(); generateSceneVideo.mockReset()
+  seedAudio.mockReset(); uploadAsset.mockReset(); mintCharacterImage.mockReset(); sceneKeyframe.mockReset(); generateSceneVideo.mockReset(); lipSyncScene.mockReset()
   seedAudio.mockResolvedValue({ url: 'https://audio', duration: 9 })
   uploadAsset.mockResolvedValue('https://hosted')
 })
@@ -99,5 +99,38 @@ describe('generateFromPlan (video mode)', () => {
       9,
       expect.any(Function),
     )
+  })
+
+  it('lip-syncs the scene video with its audio when both succeed', async () => {
+    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
+    sceneKeyframe.mockResolvedValue('https://key')
+    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
+    lipSyncScene.mockResolvedValue({ url: 'https://combined' })
+    const onLipSync = vi.fn()
+    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, { onLipSync })
+    // audio url 'https://audio' (seedAudio mock) + video url 'https://vid'
+    expect(lipSyncScene).toHaveBeenCalledWith('https://vid', 'https://audio', expect.any(Function))
+    expect(onLipSync).toHaveBeenCalledWith('sc1', 'https://combined')
+  })
+
+  it('does not lip-sync when the video step failed', async () => {
+    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
+    sceneKeyframe.mockRejectedValue(new Error('boom')) // video path throws before producing a url
+    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, {})
+    expect(lipSyncScene).not.toHaveBeenCalled()
+  })
+
+  it('a lip-sync failure is scoped and keeps the audio/video results', async () => {
+    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
+    sceneKeyframe.mockResolvedValue('https://key')
+    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
+    lipSyncScene.mockRejectedValue(new Error('no face'))
+    const onScene = vi.fn()
+    const onSceneVideo = vi.fn()
+    const onError = vi.fn()
+    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, { onScene, onSceneVideo, onError })
+    expect(onScene).toHaveBeenCalledWith('sc1', { url: 'https://audio', durationSec: 9 })
+    expect(onSceneVideo).toHaveBeenCalledWith('sc1', 'https://vid')
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('lipsync:sc1'), expect.any(String))
   })
 })
