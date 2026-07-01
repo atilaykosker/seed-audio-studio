@@ -52,6 +52,12 @@ export const ENDPOINTS = {
   seedAudio: 'bytedance/seed-audio-1.0',
   /** fal's OpenRouter gateway for LLM planning/categorization. */
   llm: 'openrouter/router',
+  /** Text-to-image for character references / scene keyframes. */
+  nanoBanana: 'fal-ai/nano-banana',
+  /** Image-conditioned edit variant (compose characters into a keyframe). */
+  nanoBananaEdit: 'fal-ai/nano-banana/edit',
+  /** Image-to-video with custom elements for cross-clip consistency. */
+  klingVideo: 'fal-ai/kling-video/v3/pro/image-to-video',
 } as const
 
 export interface ModelOption {
@@ -125,4 +131,50 @@ export async function seedAudio(
   if (args.audioUrls && args.audioUrls.length) input.audio_urls = args.audioUrls
   const { data } = await run<SeedAudioOutput>(ENDPOINTS.seedAudio, input, opts)
   return { url: data.audio.url, duration: data.audio.duration ?? 0 }
+}
+
+interface NanoBananaOutput {
+  images: { url: string; content_type?: string }[]
+  description?: string
+}
+
+/** Generate one image. With `imageUrls`, uses the edit endpoint (image-conditioned). */
+export async function nanoBanana(
+  args: { prompt: string; imageUrls?: string[]; aspectRatio?: string },
+  opts: RunOptions = {},
+): Promise<{ url: string }> {
+  const hasRefs = !!(args.imageUrls && args.imageUrls.length)
+  const input: Record<string, unknown> = { prompt: args.prompt }
+  if (args.aspectRatio) input.aspect_ratio = args.aspectRatio
+  if (hasRefs) input.image_urls = args.imageUrls
+  const { data } = await run<NanoBananaOutput>(hasRefs ? ENDPOINTS.nanoBananaEdit : ENDPOINTS.nanoBanana, input, opts)
+  const url = data.images?.[0]?.url
+  if (!url) throw new Error('nano-banana returned no image.')
+  return { url }
+}
+
+export interface KlingElement {
+  frontal_image_url: string
+  reference_image_urls?: string[]
+}
+
+interface KlingVideoOutput {
+  video: { url: string; content_type?: string; file_name?: string; file_size?: number }
+}
+
+/** Generate one kling v3 image-to-video clip. Audio disabled; duration clamped to [3,15]. */
+export async function klingVideo(
+  args: { prompt: string; startImageUrl: string; durationSec?: number; elements?: KlingElement[] },
+  opts: RunOptions = {},
+): Promise<{ url: string }> {
+  const duration = String(Math.min(15, Math.max(3, Math.round(args.durationSec ?? 5))))
+  const input: Record<string, unknown> = {
+    prompt: args.prompt,
+    start_image_url: args.startImageUrl,
+    duration,
+    generate_audio: false,
+  }
+  if (args.elements && args.elements.length) input.elements = args.elements.slice(0, 3)
+  const { data } = await run<KlingVideoOutput>(ENDPOINTS.klingVideo, input, opts)
+  return { url: data.video.url }
 }
