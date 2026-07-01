@@ -4,6 +4,8 @@ import { mapFalError } from '@/services/fal/errors'
 import { DEFAULT_MODEL } from '@/services/fal/client'
 import { makePlan } from '@/services/studio/plan'
 import { generateFromPlan, generateScene } from '@/services/studio/generate'
+import { sceneKeyframe } from '@/services/studio/image'
+import { generateSceneVideo } from '@/services/studio/video'
 import type { Brief, Clip, CharacterImage, Plan, StudioStatus, Voice } from '@/lib/types'
 
 const LIB_KEY = 'seed-audio-studio:library'
@@ -222,7 +224,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   regenScene: async (sceneId) => {
-    const { plan, library } = get()
+    const { plan, library, characterLibrary, brief } = get()
     if (!plan) return
     const scene = plan.scenes.find((s) => s.id === sceneId)
     if (!scene) return
@@ -230,12 +232,41 @@ export const useStore = create<Store>((set, get) => ({
     for (const v of library) urlByName.set(v.name, v.url)
     const patch = (p: Partial<Clip>) =>
       set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...p } : c)) }))
-    patch({ status: 'running', error: undefined, url: undefined })
+    patch({
+      status: 'running',
+      error: undefined,
+      url: undefined,
+      videoUrl: undefined,
+      videoStatus: undefined,
+      videoPhase: undefined,
+    })
     try {
       const r = await generateScene(scene, urlByName, {
         onScenePhase: (_id, phase) => patch({ phase }),
       })
       patch({ status: 'done', url: r.url, durationSec: r.durationSec })
+
+      if (brief.withVideo) {
+        patch({ videoStatus: 'running' })
+        try {
+          const imageByName = new Map<string, string>()
+          for (const img of characterLibrary) imageByName.set(img.name.toLowerCase(), img.url)
+          // Preserve index alignment with scene.speakers, same rule as the main pipeline.
+          const mappedImages = scene.speakers.map((n) => imageByName.get(n.toLowerCase()))
+          const presentImages = mappedImages.filter((u): u is string => !!u)
+          const keyframe = await sceneKeyframe(scene, presentImages)
+          patch({ imageUrl: keyframe })
+          const elementImages = presentImages.length > 0 && mappedImages.every((u) => !!u) ? presentImages : []
+          const v = await generateSceneVideo(scene, keyframe, elementImages, r.durationSec || 10, (phase) =>
+            patch({ videoPhase: phase }),
+          )
+          patch({ videoStatus: 'done', videoUrl: v.url })
+        } catch (e) {
+          const fe = mapFalError(e)
+          patch({ videoStatus: 'error' })
+          get().toast({ kind: 'error', title: 'Video issue', message: fe.message })
+        }
+      }
     } catch (e) {
       const fe = mapFalError(e)
       patch({ status: 'error', error: fe.message })

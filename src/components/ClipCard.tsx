@@ -13,7 +13,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const syncPlay = () => {
-    videoRef.current?.play()
+    videoRef.current?.play().catch(() => {})
   }
   const syncPause = () => {
     videoRef.current?.pause()
@@ -44,6 +44,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
           <video
             ref={videoRef}
             src={clip.videoUrl}
+            poster={clip.imageUrl}
             muted
             loop
             playsInline
@@ -61,6 +62,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
             onPlay={syncPlay}
             onPause={syncPause}
             onSeeked={syncSeek}
+            onEnded={() => videoRef.current?.pause()}
           />
         )}
         {busy && (

@@ -69,4 +69,27 @@ describe('generateFromPlan (video mode)', () => {
     expect(onScene).toHaveBeenCalledWith('sc1', { url: 'https://audio', durationSec: 9 })
     expect(onError).toHaveBeenCalledWith(expect.stringContaining('video:sc1'), expect.any(String))
   })
+
+  it('passes empty elements when a middle speaker image is missing, to avoid misaligned @ElementN refs', async () => {
+    const twoSpeakerPlan: Plan = {
+      category: 'Drama',
+      characters: [
+        { name: 'A', voiceSpec: 's', refPrompt: 'r', appearance: 'tall' },
+        { name: 'B', voiceSpec: 's', refPrompt: 'r', appearance: 'short' },
+      ],
+      scenes: [{ id: 'sc1', kind: 'TA2A', title: 't', speakers: ['A', 'B'], prompt: 'p', visual: 'wide' }],
+    }
+    sceneKeyframe.mockResolvedValue('https://key')
+    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
+
+    // Only B's image resolves (via characterLibrary); A's is missing entirely.
+    await generateFromPlan(
+      twoSpeakerPlan,
+      { library: [], characterLibrary: [{ id: 'x', name: 'B', url: 'https://charB', source: 'minted', createdAt: 0 }], withVideo: true },
+      {},
+    )
+
+    expect(sceneKeyframe).toHaveBeenCalledWith(twoSpeakerPlan.scenes[0], ['https://charB'])
+    expect(generateSceneVideo).toHaveBeenCalledWith(twoSpeakerPlan.scenes[0], 'https://key', [], 9, expect.any(Function))
+  })
 })

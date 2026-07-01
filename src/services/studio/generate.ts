@@ -132,12 +132,15 @@ export async function generateFromPlan(
     if (withVideo) {
       cb.onSceneVideoStart?.(scene.id)
       try {
-        const presentImages = scene.speakers
-          .map((n) => imageByName.get(n.toLowerCase()))
-          .filter((u): u is string => !!u)
+        // Preserve index alignment with scene.speakers so @ElementN maps to the right character.
+        const mappedImages = scene.speakers.map((n) => imageByName.get(n.toLowerCase()))
+        const presentImages = mappedImages.filter((u): u is string => !!u)
         const keyframe = await sceneKeyframe(scene, presentImages)
         cb.onKeyframe?.(scene.id, keyframe)
-        const v = await generateSceneVideo(scene, keyframe, presentImages, durationSec, (p) =>
+        // Only pass @Element refs when every present speaker resolved to an image; a gap would
+        // misalign @ElementN against the wrong character, so fall back to keyframe-only video.
+        const elementImages = presentImages.length > 0 && mappedImages.every((u) => !!u) ? presentImages : []
+        const v = await generateSceneVideo(scene, keyframe, elementImages, durationSec, (p) =>
           cb.onSceneVideoPhase?.(scene.id, p),
         )
         cb.onSceneVideo?.(scene.id, v.url)
