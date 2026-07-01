@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Download, RefreshCw, ChevronDown, Loader2, AlertCircle } from 'lucide-react'
 import { Badge, Button, Card, CardContent } from '@/components/ui'
 import { useStore } from '@/store/useStore'
@@ -9,6 +9,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
   const regen = useStore((s) => s.regenScene)
   const [showPrompt, setShowPrompt] = useState(false)
   const [mediaError, setMediaError] = useState(false)
+  useEffect(() => setMediaError(false), [clip.url, clip.videoUrl, clip.lipsyncUrl])
   const busy = clip.status === 'running'
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)

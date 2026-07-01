@@ -112,23 +112,28 @@ interface Store {
   regenScene: (sceneId: string) => Promise<void>
 }
 
+const _sessions0 = loadSessions()
+const _activeId0 = localStorage.getItem(ACTIVE_KEY)
+const _active0 = _sessions0.find((x) => x.id === _activeId0) ?? null
+if (_activeId0 && !_active0) localStorage.removeItem(ACTIVE_KEY)
+
 export const useStore = create<Store>((set, get) => ({
   key: null,
   keyDialogOpen: false,
   toasts: [],
 
   model: localStorage.getItem(MODEL_KEY) ?? DEFAULT_MODEL,
-  brief: DEFAULT_BRIEF,
+  brief: _active0 ? _active0.brief : DEFAULT_BRIEF,
   library: loadLibrary(),
   characterLibrary: loadCharacterLibrary(),
 
-  sessions: loadSessions(),
-  activeSessionId: localStorage.getItem(ACTIVE_KEY),
+  sessions: _sessions0,
+  activeSessionId: _active0 ? _activeId0 : null,
 
-  plan: null,
-  category: null,
-  clips: [],
-  status: 'idle',
+  plan: _active0?.plan ?? null,
+  category: _active0?.category ?? null,
+  clips: _active0?.clips ?? [],
+  status: _active0 && _active0.clips.length ? 'done' : 'idle',
   currentStep: null,
 
   setKey: (k) => set({ key: k }),
@@ -242,14 +247,22 @@ export const useStore = create<Store>((set, get) => ({
     set((s) => {
       const t = title.trim() || 'Untitled'
       const next = s.sessions.map((x) => (x.id === id ? { ...x, title: t, updatedAt: Date.now() } : x))
-      saveSessions(next)
+      try {
+        saveSessions(next)
+      } catch {
+        get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
+      }
       return { sessions: next }
     }),
 
   deleteSession: (id) =>
     set((s) => {
       const next = s.sessions.filter((x) => x.id !== id)
-      saveSessions(next)
+      try {
+        saveSessions(next)
+      } catch {
+        get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
+      }
       if (s.activeSessionId === id) {
         localStorage.removeItem(ACTIVE_KEY)
         return { sessions: next, activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, category: null, clips: [], status: 'idle', currentStep: null }
