@@ -43,6 +43,11 @@ export async function finishCharacter(db: SupabaseClient, id: string, imageKey: 
   if (error) throw error
 }
 
+export async function setCharacterError(db: SupabaseClient, id: string): Promise<void> {
+  const { error } = await db.from('character_library').update({ status: 'error', request_id: null }).eq('id', id)
+  if (error) throw error
+}
+
 export async function getCharacter(db: SupabaseClient, id: string): Promise<CharacterRow | null> {
   const { data, error } = await db.from('character_library').select('*').eq('id', id).single()
   if (error && (error as { code?: string }).code !== 'PGRST116') throw error

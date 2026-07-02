@@ -4,7 +4,7 @@ import { configureFal, jobStatus, jobResult, downloadToBytes } from '@/src/serve
 import { ENDPOINTS } from '@/src/services/fal/client'
 import { mapFalError } from '@/src/services/fal/errors'
 import { getSupabase } from '@/src/server/db/client'
-import { getCharacter, finishCharacter } from '@/src/server/db/characters'
+import { getCharacter, finishCharacter, setCharacterError } from '@/src/server/db/characters'
 import { makeS3 } from '@/src/server/storage/s3'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const st = await jobStatus(ENDPOINTS.nanoBanana, row.request_id)
     if (st.phase !== 'done') return NextResponse.json({ status: st.phase })
     const data = await jobResult<{ images: { url: string }[] }>(ENDPOINTS.nanoBanana, row.request_id)
+    if (!data.images?.length) throw new Error('fal returned no image')
     const url = data.images[0].url
     const { bytes, contentType } = await downloadToBytes(url)
     const key = `characters/${id}.png`
@@ -28,6 +29,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     await finishCharacter(db, id, key)
     return NextResponse.json({ status: 'done', url: await s3.presignGet(key) })
   } catch (e) {
+    try {
+      await setCharacterError(db, id)
+    } catch {
+      // best-effort; don't mask the original error
+    }
     return NextResponse.json({ status: 'error', error: mapFalError(e) }, { status: 502 })
   }
 }
