@@ -1,30 +1,22 @@
 import { llmText, type RunOptions } from '@/services/fal/client'
-import type { Brief, Plan, Scene, Voice } from '@/lib/types'
+import type { Brief, Plan, Scene } from '@/lib/types'
 import { uid } from '@/lib/utils'
-import { SEED_AUDIO_GUIDE, OUTPUT_DIRECTIVE, VIDEO_DIRECTIVE } from './guide'
+import { DIRECTOR_GUIDE, OUTPUT_DIRECTIVE } from './guide'
 
-export function buildPlanPrompt(b: Brief, provided: Voice[] = []): string {
+export function buildPlanPrompt(b: Brief): string {
   const speakers =
-    b.speakers === 'auto' ? 'Choose a sensible number of distinct speakers.' : `Use about ${b.speakers} distinct speaker(s).`
+    b.speakers === 'auto'
+      ? 'Choose a sensible number of distinct characters.'
+      : `Use about ${b.speakers} distinct character(s).`
   const genre = b.genre.trim() ? `Genre/style hint: ${b.genre.trim()}.` : ''
-  const providedBlock = provided.length
-    ? [
-        'The user has supplied these reference voice samples. You MUST cast each one as a character, using its EXACT name below (do not invent a replacement voice for it). Build the story around them; add at most a few more characters only if the scene needs them:',
-        ...provided.map((v) => `- ${v.name}: ${v.voiceSpec || 'a user-provided voice sample'}`),
-      ].join('\n')
-    : ''
-  const videoBlock = b.withVideo
-    ? 'Video mode is ON: keep every scene <= 15 seconds of audio (split as needed), and include an "appearance" for each character and a "visual" for each scene.'
-    : ''
   return [
     `Brief: ${b.idea.trim()}`,
-    `Target total length: about ${b.durationSec} seconds.`,
-    `Language: ${b.language === 'ZH' ? 'Chinese' : 'English'}.`,
+    `Target total length: about ${b.durationSec} seconds (split into ≤8s shots).`,
+    `Language for spoken dialogue: ${b.language === 'ZH' ? 'Chinese' : 'English'}.`,
+    `Orientation: ${b.aspect === 'portrait' ? 'portrait (9:16)' : 'landscape (16:9)'}.`,
     speakers,
     genre,
-    providedBlock,
-    videoBlock,
-    `Plan the characters and the scene(s) needed to realize this, following all the rules. Categorize it and weave in fitting SFX/atmosphere/music.`,
+    `Plan the characters and the shots needed to realize this, following all the rules. Categorize it.`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -32,8 +24,8 @@ export function buildPlanPrompt(b: Brief, provided: Voice[] = []): string {
 
 interface RawPlan {
   category?: string
-  characters?: { name?: string; voiceSpec?: string; refPrompt?: string; appearance?: string }[]
-  scenes?: { kind?: string; title?: string; speakers?: string[]; prompt?: string; visual?: string }[]
+  characters?: { name?: string; appearance?: string; voice?: string }[]
+  scenes?: { title?: string; speakers?: string[]; visual?: string; dialogue?: string }[]
 }
 
 /** Pull the first balanced JSON object out of an LLM response (tolerates fences/prose). */
@@ -53,46 +45,33 @@ export function parsePlan(text: string): Plan {
     throw new Error('LLM plan missing characters/scenes.')
   }
   const characters = raw.characters
-    .filter((c) => c.name && c.refPrompt)
+    .filter((c) => c.name)
     .map((c) => ({
       name: c.name!.trim(),
-      voiceSpec: (c.voiceSpec ?? '').trim(),
-      refPrompt: c.refPrompt!.trim(),
-      ...(c.appearance && c.appearance.trim() ? { appearance: c.appearance.trim() } : {}),
+      appearance: (c.appearance ?? '').trim(),
+      voice: (c.voice ?? '').trim(),
     }))
   const scenes: Scene[] = raw.scenes
-    .filter((s) => s.prompt)
+    .filter((s) => s.visual || s.dialogue)
     .map((s) => ({
       id: uid(),
-      kind: s.kind === 'T2A' ? 'T2A' : 'TA2A',
-      title: (s.title ?? 'Scene').trim(),
+      title: (s.title ?? 'Shot').trim(),
       speakers: (s.speakers ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 3),
-      prompt: s.prompt!.trim(),
-      ...(s.visual && s.visual.trim() ? { visual: s.visual.trim() } : {}),
+      visual: (s.visual ?? '').trim(),
+      dialogue: (s.dialogue ?? '').trim(),
     }))
   if (!scenes.length) throw new Error('LLM plan has no scenes.')
   return { category: (raw.category ?? 'Other').trim(), characters, scenes }
 }
 
 /** Call the LLM and parse a Plan. Retries once with a stricter nudge on parse failure. */
-export async function makePlan(
-  brief: Brief,
-  model: string,
-  provided: Voice[] = [],
-  opts: RunOptions = {},
-): Promise<Plan> {
-  const userPrompt = buildPlanPrompt(brief, provided)
-  const systemBase = SEED_AUDIO_GUIDE + OUTPUT_DIRECTIVE + (brief.withVideo ? VIDEO_DIRECTIVE : '')
+export async function makePlan(brief: Brief, model: string, opts: RunOptions = {}): Promise<Plan> {
+  const userPrompt = buildPlanPrompt(brief)
+  const systemBase = DIRECTOR_GUIDE + OUTPUT_DIRECTIVE
   const attempt = async (extra = '') =>
     parsePlan(
       await llmText(
-        {
-          systemPrompt: systemBase + extra,
-          prompt: userPrompt,
-          model,
-          temperature: 0.7,
-          maxTokens: 3500,
-        },
+        { systemPrompt: systemBase + extra, prompt: userPrompt, model, temperature: 0.7, maxTokens: 3500 },
         opts,
       ),
     )
