@@ -27,11 +27,11 @@ export function SettingsDialog({
 }) {
   const setKey = useStore((s) => s.setKey)
   const clearResults = useStore((s) => s.clearResults)
-  const clearLibrary = useStore((s) => s.clearLibrary)
+  const clearCharacterLibrary = useStore((s) => s.clearCharacterLibrary)
   const toast = useStore((s) => s.toast)
   const model = useStore((s) => s.model)
   const setModel = useStore((s) => s.setModel)
-  const libCount = useStore((s) => s.library.length)
+  const charCount = useStore((s) => s.characterLibrary.length)
 
   function forgetKey() {
     clearKey()
@@ -44,7 +44,7 @@ export function SettingsDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Your key and voice library live only in this browser.</DialogDescription>
+          <DialogDescription>Your key and character library live only in this browser.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
@@ -79,11 +79,11 @@ export function SettingsDialog({
           <Button
             variant="outline"
             onClick={() => {
-              clearLibrary()
-              toast({ kind: 'success', title: 'Voice library cleared' })
+              clearCharacterLibrary()
+              toast({ kind: 'success', title: 'Character library cleared' })
             }}
           >
-            <Library className="size-4" /> Clear voice library ({libCount})
+            <Library className="size-4" /> Clear character library ({charCount})
           </Button>
           <Button variant="destructive" onClick={forgetKey}>
             <KeyRound className="size-4" /> Forget API key

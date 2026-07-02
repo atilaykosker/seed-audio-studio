@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { AudioLines, Loader2, Menu } from 'lucide-react'
+import { Clapperboard, Loader2, Menu } from 'lucide-react'
 import { Badge, Card, CardContent, Separator } from '@/components/ui'
 import { BriefForm } from '@/components/BriefForm'
-import { VoiceLibraryPanel } from '@/components/VoiceLibraryPanel'
 import { CharacterLibraryPanel } from '@/components/CharacterLibraryPanel'
 import { ClipCard } from '@/components/ClipCard'
 import { SessionSidebar } from '@/components/SessionSidebar'
@@ -17,7 +16,7 @@ export function Studio() {
   const category = useStore((s) => s.category)
   const clips = useStore((s) => s.clips)
   const plan = useStore((s) => s.plan)
-  const brief = useStore((s) => s.brief)
+  const videoModel = useStore((s) => s.videoModel)
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -26,18 +25,13 @@ export function Studio() {
           <button className="lg:hidden" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle sessions">
             <Menu className="size-5" />
           </button>
-          <AudioLines className="size-5 text-primary" />
-          <span className="font-semibold leading-tight">Seed Audio Studio</span>
+          <Clapperboard className="size-5 text-primary" />
+          <span className="font-semibold leading-tight">Seed Studio</span>
         </div>
       </header>
 
       <div className="mx-auto flex max-w-[1400px]">
-        <div
-          className={cn(
-            'w-60 shrink-0 border-r border-border/60',
-            sidebarOpen ? 'block' : 'hidden lg:block',
-          )}
-        >
+        <div className={cn('w-60 shrink-0 border-r border-border/60', sidebarOpen ? 'block' : 'hidden lg:block')}>
           <SessionSidebar />
         </div>
 
@@ -51,7 +45,6 @@ export function Studio() {
             </Card>
             <Card>
               <CardContent className="pt-5 space-y-5">
-                <VoiceLibraryPanel />
                 <CharacterLibraryPanel />
               </CardContent>
             </Card>
@@ -70,7 +63,7 @@ export function Studio() {
                 </span>
                 {plan && (
                   <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
-                    Est. cost: {formatUSD(estimatePlanCost(plan, brief.durationSec, brief.withVideo))}
+                    Est. cost: {formatUSD(estimatePlanCost(plan, videoModel))}
                   </span>
                 )}
               </div>
@@ -78,11 +71,11 @@ export function Studio() {
 
             {status === 'idle' && clips.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/60 p-10 text-center text-muted-foreground">
-                <AudioLines className="size-8 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Describe a scene on the left and hit Generate.</p>
+                <Clapperboard className="size-8 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">Describe a video on the left and hit Generate.</p>
                 <p className="text-xs mt-1">
-                  The model categorizes it, writes the seed-audio prompt with effects, mints each character voice, and
-                  renders the audio.
+                  The model plans short shots, mints a reference image per character, and renders each shot as a video
+                  with native audio.
                 </p>
               </div>
             ) : (
