@@ -4,14 +4,16 @@ vi.mock('@/services/studio/plan', () => ({
   makePlan: vi.fn(async () => ({
     category: 'Podcast',
     characters: [],
-    scenes: [{ id: 's1', kind: 'T2A', title: 'Scene', speakers: [], prompt: 'p' }],
+    scenes: [{ id: 's1', title: 'Scene', speakers: [], visual: 'v', dialogue: '' }],
   })),
 }))
 vi.mock('@/services/studio/generate', () => ({
-  generateFromPlan: vi.fn(async (_plan: unknown, _args: unknown, cb: { onScene?: (id: string, r: { url: string; durationSec: number }) => void }) => {
-    cb.onScene?.('s1', { url: 'https://audio', durationSec: 5 })
-  }),
-  generateScene: vi.fn(),
+  generateFromPlan: vi.fn(
+    async (_plan: unknown, _args: unknown, cb: { onScene?: (id: string, r: { url: string }) => void }) => {
+      cb.onScene?.('s1', { url: 'https://video' })
+    },
+  ),
+  generateSceneClip: vi.fn(),
 }))
 
 import { useStore } from './useStore'
@@ -24,7 +26,7 @@ beforeEach(() => {
     activeSessionId: null,
     clips: [],
     plan: null,
-    brief: { ...useStore.getState().brief, idea: 'a rainy day', withVideo: false },
+    brief: { ...useStore.getState().brief, idea: 'a rainy day' },
   })
 })
 
@@ -35,7 +37,7 @@ describe('runStudio session persistence', () => {
     expect(sessions).toHaveLength(1)
     expect(sessions[0].title).toBe('a rainy day')
     expect(sessions[0].category).toBe('Podcast')
-    expect(sessions[0].clips.some((c: { url?: string }) => c.url === 'https://audio')).toBe(true)
+    expect(sessions[0].clips.some((c: { videoUrl?: string }) => c.videoUrl === 'https://video')).toBe(true)
   })
 
   it('reuses the active session instead of creating a second one on regenerate', async () => {

@@ -1,19 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useStore } from './useStore'
-import type { CharacterImage, Session } from '@/lib/types'
+import type { CharacterImage, Clip, Session } from '@/lib/types'
 
 const img: CharacterImage = { id: 'c1', name: 'A', url: 'https://a', source: 'minted', createdAt: 1 }
 
+const clip1: Clip = { id: 'c1', sceneId: 's1', title: 'S', speakers: [], prompt: 'p', status: 'done', videoUrl: 'https://a' }
+
 beforeEach(() => {
   localStorage.clear()
-  useStore.setState({ characterLibrary: [], brief: { ...useStore.getState().brief, withVideo: false } })
+  useStore.setState({ characterLibrary: [] })
 })
 
 describe('character library', () => {
-  it('defaults brief.withVideo to false', () => {
-    expect(useStore.getState().brief.withVideo).toBe(false)
-  })
-
   it('addCharacterImage persists to localStorage and dedupes by id', () => {
     useStore.getState().addCharacterImage(img)
     useStore.getState().addCharacterImage({ ...img, url: 'https://a2' })
@@ -52,17 +50,17 @@ describe('sessions', () => {
   it('saveActiveSession snapshots brief/plan/category/clips into the active session', () => {
     useStore.setState({ brief: { ...useStore.getState().brief, idea: 'a' } })
     useStore.getState().beginSession()
-    useStore.setState({ category: 'Podcast', clips: [{ id: 'c1', sceneId: 's1', title: 'S', kind: 'T2A', speakers: [], prompt: 'p', status: 'done', url: 'https://a' }] })
+    useStore.setState({ category: 'Podcast', clips: [clip1] })
     useStore.getState().saveActiveSession()
     const lib = JSON.parse(localStorage.getItem('seed-audio-studio:sessions')!) as Session[]
     expect(lib[0].category).toBe('Podcast')
-    expect(lib[0].clips[0].url).toBe('https://a')
+    expect(lib[0].clips[0].videoUrl).toBe('https://a')
   })
 
   it('loadSession restores brief/plan/clips and marks status done when clips exist', () => {
     useStore.setState({ brief: { ...useStore.getState().brief, idea: 'first' } })
     useStore.getState().beginSession()
-    useStore.setState({ clips: [{ id: 'c1', sceneId: 's1', title: 'S', kind: 'T2A', speakers: [], prompt: 'p', status: 'done', url: 'https://a' }] })
+    useStore.setState({ clips: [clip1] })
     useStore.getState().saveActiveSession()
     const id = useStore.getState().activeSessionId!
     useStore.getState().newSession()
