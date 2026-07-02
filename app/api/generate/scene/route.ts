@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       if (stage) {
         const name = `${bioPlan.subject} — ${stage.label}`.toLowerCase()
         const row = characters.find((c) => c.name.toLowerCase() === name)
-        if (row) stageUrls.push(await s3.presignGet(row.image_key))
+        if (row && row.status === 'done' && row.image_key) stageUrls.push(await s3.presignGet(row.image_key))
       }
       job = bioKeyframeJob(shot.visual, stageUrls, bioPlan.style, session.brief.aspect)
     } else {
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       const presentUrls: string[] = []
       for (const name of scene.speakers) {
         const row = characters.find((c) => c.name.toLowerCase() === name.toLowerCase())
-        if (row) presentUrls.push(await s3.presignGet(row.image_key))
+        if (row && row.status === 'done' && row.image_key) presentUrls.push(await s3.presignGet(row.image_key))
       }
       job = sceneKeyframeJob(scene, presentUrls, session.brief.aspect)
     }
@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
       status: 'running',
       phase: 'queued',
       image_key: null,
+      video_key: null,
+      error: null,
     })
     return NextResponse.json({ requestId })
   } catch (e) {
