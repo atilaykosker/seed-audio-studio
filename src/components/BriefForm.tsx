@@ -11,13 +11,14 @@ import {
   SelectValue,
   Input,
 } from '@/components/ui'
+import { VideoModelPicker } from '@/components/VideoModelPicker'
 import { useStore } from '@/store/useStore'
 
 const EXAMPLES = [
-  'A two-host comedy podcast where one host confesses an embarrassing first-day-at-work story.',
-  'A tense radio drama: a detective confronts a suspect in a rain-soaked alley at midnight.',
-  'A calming sleep meditation guiding the listener down to a quiet shore at dusk.',
-  'A 30-second upbeat advertisement for a fictional artisan coffee brand.',
+  'A cartoon fox discovers a glowing lamp in a moonlit forest and gasps in wonder.',
+  'A tense noir detective confronts a suspect in a rain-soaked alley at midnight.',
+  'A 15-second upbeat advertisement for a fictional artisan coffee brand.',
+  'A sci-fi pilot warns her crew as alarms flash across the cockpit.',
 ]
 
 export function BriefForm() {
@@ -26,15 +27,7 @@ export function BriefForm() {
   const run = useStore((s) => s.runStudio)
   const status = useStore((s) => s.status)
   const hasKey = useStore((s) => !!s.key)
-  const library = useStore((s) => s.library)
   const busy = status === 'planning' || status === 'generating'
-
-  const toggleVoice = (id: string) =>
-    setBrief({
-      voiceIds: brief.voiceIds.includes(id)
-        ? brief.voiceIds.filter((x) => x !== id)
-        : [...brief.voiceIds, id],
-    })
 
   return (
     <div className="space-y-4">
@@ -43,7 +36,7 @@ export function BriefForm() {
         <Textarea
           id="idea"
           rows={5}
-          placeholder="Describe the scene, story, or audio you want…"
+          placeholder="Describe the video you want…"
           value={brief.idea}
           onChange={(e) => setBrief({ idea: e.target.value })}
         />
@@ -101,6 +94,21 @@ export function BriefForm() {
           </Select>
         </div>
         <div className="space-y-2">
+          <Label>Orientation</Label>
+          <Select
+            value={brief.aspect}
+            onValueChange={(v) => setBrief({ aspect: v as 'landscape' | 'portrait' })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="landscape">Landscape 16:9</SelectItem>
+              <SelectItem value="portrait">Portrait 9:16</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2 col-span-2">
           <Label htmlFor="genre">Genre hint</Label>
           <Input
             id="genre"
@@ -111,49 +119,11 @@ export function BriefForm() {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={brief.withVideo}
-          onChange={(e) => setBrief({ withVideo: e.target.checked })}
-          className="size-4 rounded border-border/60 accent-primary"
-        />
-        Also generate video (nano-banana + kling) — higher cost
-      </label>
-
-      {library.length > 0 && (
-        <div className="space-y-2">
-          <Label>Reference voices (optional)</Label>
-          <p className="text-xs text-muted-foreground">
-            Pin uploaded/minted samples — the planner casts them as characters and binds them via @Audio.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {library.map((v) => {
-              const on = brief.voiceIds.includes(v.id)
-              return (
-                <button
-                  key={v.id}
-                  onClick={() => toggleVoice(v.id)}
-                  className={
-                    'text-xs rounded-md border px-2 py-1 transition-colors ' +
-                    (on
-                      ? 'border-primary bg-primary/15 text-foreground'
-                      : 'border-border/60 text-muted-foreground hover:bg-accent hover:text-accent-foreground')
-                  }
-                >
-                  {on ? '✓ ' : ''}
-                  {v.name}
-                  {v.source === 'uploaded' ? ' ↑' : ''}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      <VideoModelPicker />
 
       <Button className="w-full" disabled={busy} onClick={() => run()}>
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-        {busy ? 'Generating…' : hasKey ? 'Generate audio' : 'Add key & generate'}
+        {busy ? 'Generating…' : hasKey ? 'Generate video' : 'Add key & generate'}
       </Button>
     </div>
   )
