@@ -1,91 +1,31 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-const { klingVideo, latentSync, mergeAudioVideo } = vi.hoisted(() => {
-  return { klingVideo: vi.fn(), latentSync: vi.fn(), mergeAudioVideo: vi.fn() }
-})
-
-vi.mock('@/services/fal/client', () => ({ klingVideo, latentSync, mergeAudioVideo }))
-
-import { generateSceneVideo, buildElementPrompt, lipSyncScene } from './video'
+import { describe, it, expect } from 'vitest'
+import { buildVideoPrompt } from './video'
 import type { Scene } from '@/lib/types'
 
-beforeEach(() => {
-  klingVideo.mockReset()
-  latentSync.mockReset()
-  mergeAudioVideo.mockReset()
-})
+const scene: Scene = {
+  id: '1',
+  title: 'Meet',
+  speakers: ['Rio', 'Bo'],
+  visual: 'Rio waves at Bo in a sunny park, wide shot',
+  dialogue: 'Rio: "Hi Bo!" Bo: "Hello Rio."',
+}
+const voices = new Map([
+  ['rio', 'bright high energetic girl'],
+  ['bo', 'deep calm synthetic'],
+])
 
-const scene: Scene = { id: '1', kind: 'TA2A', title: 't', speakers: ['A', 'B'], prompt: 'p', visual: '@Element1 and @Element2 talk' }
-
-describe('generateSceneVideo', () => {
-  it('maps present character images to elements in order and passes visual as prompt', async () => {
-    klingVideo.mockResolvedValue({ url: 'https://v/1' })
-    const r = await generateSceneVideo(scene, 'https://key', ['https://a', 'https://b'], 12)
-    expect(r.url).toBe('https://v/1')
-    const [args] = klingVideo.mock.calls[0]
-    expect(args).toMatchObject({ prompt: '@Element1 and @Element2 talk', startImageUrl: 'https://key', durationSec: 12 })
-    expect(args.elements).toEqual([{ frontal_image_url: 'https://a' }, { frontal_image_url: 'https://b' }])
+describe('buildVideoPrompt', () => {
+  it('for audio models includes visual, dialogue, and per-speaker voice descriptions', () => {
+    const p = buildVideoPrompt(scene, voices, true)
+    expect(p).toContain('sunny park')
+    expect(p).toContain('Hi Bo')
+    expect(p).toContain('bright high energetic girl')
+    expect(p).toContain('deep calm synthetic')
   })
 
-  it('falls back to the audio prompt when visual is absent and sends no elements for narrator', async () => {
-    klingVideo.mockResolvedValue({ url: 'https://v/2' })
-    const narrator: Scene = { id: '2', kind: 'T2A', title: 't', speakers: [], prompt: 'the storm rolls in' }
-    await generateSceneVideo(narrator, 'https://key', [], 8)
-    const [args] = klingVideo.mock.calls[0]
-    expect(args.prompt).toBe('the storm rolls in')
-    expect(args.elements).toEqual([])
-  })
-
-  it('drops an imageless narrator speaker and renumbers @ElementN for the visible characters', async () => {
-    klingVideo.mockResolvedValue({ url: 'https://v/3' })
-    // speakers [Narrator, Bunny, Rio]; narrator has no image → aligned array has a leading gap.
-    const s: Scene = {
-      id: '3',
-      kind: 'TA2A',
-      title: 't',
-      speakers: ['Narrator', 'Bunny', 'Rio'],
-      prompt: 'p',
-      visual: '[rain] @Element2 looks sad while @Element3 flutters',
-    }
-    await generateSceneVideo(s, 'https://key', [undefined, 'https://bunny', 'https://rio'], 10)
-    const [args] = klingVideo.mock.calls[0]
-    expect(args.elements).toEqual([{ frontal_image_url: 'https://bunny' }, { frontal_image_url: 'https://rio' }])
-    expect(args.prompt).toBe('[rain] @Element1 looks sad while @Element2 flutters')
-  })
-})
-
-describe('buildElementPrompt', () => {
-  it('renumbers refs and drops the imageless slot', () => {
-    const r = buildElementPrompt('@Element1 narrates, @Element2 waves, @Element3 nods', [undefined, 'https://b', 'https://c'])
-    expect(r.elements).toEqual([{ frontal_image_url: 'https://b' }, { frontal_image_url: 'https://c' }])
-    // @Element1 (narrator, no image) removed; @Element2->1, @Element3->2
-    expect(r.prompt).toBe('narrates, @Element1 waves, @Element2 nods')
-  })
-
-  it('returns no elements and strips all refs when nothing has an image', () => {
-    const r = buildElementPrompt('@Element1 and @Element2 chat', [undefined, undefined])
-    expect(r.elements).toEqual([])
-    expect(r.prompt).not.toMatch(/@Element/)
-  })
-})
-
-describe('lipSyncScene', () => {
-  it('passes the video + audio urls through to latentSync and wires onPhase', async () => {
-    latentSync.mockResolvedValue({ url: 'https://combined' })
-    const onPhase = vi.fn()
-    const r = await lipSyncScene('https://vid', 'https://aud', onPhase)
-    expect(r.url).toBe('https://combined')
-    const [args, opts] = latentSync.mock.calls[0]
-    expect(args).toEqual({ videoUrl: 'https://vid', audioUrl: 'https://aud' })
-    expect(typeof opts.onProgress).toBe('function')
-    expect(mergeAudioVideo).not.toHaveBeenCalled()
-  })
-
-  it('falls back to a plain mux when lip-sync fails (e.g. no face detected)', async () => {
-    latentSync.mockRejectedValue(new Error('face_detection_error'))
-    mergeAudioVideo.mockResolvedValue({ url: 'https://muxed' })
-    const r = await lipSyncScene('https://vid', 'https://aud')
-    expect(r.url).toBe('https://muxed')
-    expect(mergeAudioVideo).toHaveBeenCalledWith({ videoUrl: 'https://vid', audioUrl: 'https://aud' }, {})
+  it('for silent models includes the visual but omits dialogue lines', () => {
+    const p = buildVideoPrompt(scene, voices, false)
+    expect(p).toContain('sunny park')
+    expect(p).not.toContain('Hi Bo')
   })
 })

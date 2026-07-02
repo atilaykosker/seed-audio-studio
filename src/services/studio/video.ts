@@ -1,70 +1,44 @@
-import { klingVideo, latentSync, mergeAudioVideo, type KlingElement, type QueuePhase } from '@/services/fal/client'
+import { getVideoModel, nativeVideo, type QueuePhase, type VideoModelId } from '@/services/fal/client'
 import type { Scene } from '@/lib/types'
 
 /**
- * Map speakers' images (aligned to scene.speakers, `undefined` where a speaker has no image —
- * e.g. a narrator or an off-screen voice) to kling elements, renumbering `@ElementN` in the
- * prompt so it only references images actually sent. Imageless speakers (and their `@Element`
- * mentions) are dropped, and the remaining characters are renumbered 1..k in order — so a
- * scene like [Narrator, Bunny, Rio] still sends Bunny + Rio as @Element1 + @Element2.
+ * Compose the prompt sent to the video model. Audio-capable models get the visual + a
+ * voice-description line per speaker + the dialogue (so the same character sounds
+ * consistent across shots — best-effort). Silent models get the visual only.
  */
-export function buildElementPrompt(
-  prompt: string,
-  mappedImageUrls: (string | undefined)[],
-): { prompt: string; elements: KlingElement[] } {
-  const elements: KlingElement[] = []
-  const newIndexByOld = new Map<number, number>()
-  mappedImageUrls.forEach((url, i) => {
-    if (url) {
-      elements.push({ frontal_image_url: url })
-      newIndexByOld.set(i + 1, elements.length) // old 1-based speaker index -> new element index
-    }
-  })
-  const capped = elements.slice(0, 3)
-  const rewritten = prompt
-    .replace(/@Element\s*(\d+)/gi, (_m, n) => {
-      const nn = newIndexByOld.get(Number(n))
-      return nn && nn <= capped.length ? `@Element${nn}` : ''
-    })
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\s+([,.;:!?])/g, '$1')
-    .trim()
-  return { prompt: rewritten, elements: capped }
+export function buildVideoPrompt(scene: Scene, voiceByName: Map<string, string>, audio: boolean): string {
+  const parts: string[] = [scene.visual.trim()]
+  if (audio && scene.dialogue.trim()) {
+    const voiceLines = scene.speakers
+      .map((n) => {
+        const v = voiceByName.get(n.toLowerCase())
+        return v ? `${n} (${v})` : ''
+      })
+      .filter(Boolean)
+    if (voiceLines.length) parts.push(`Voices — ${voiceLines.join('; ')}.`)
+    parts.push(scene.dialogue.trim())
+  }
+  return parts.filter(Boolean).join('\n')
 }
 
-/**
- * Generate one scene's video via kling v3 i2v. `mappedImageUrls` is aligned to `scene.speakers`
- * (undefined where a speaker has no character image); on-screen characters become @Element1..3.
- */
+export interface GenerateSceneVideoArgs {
+  model: VideoModelId
+  scene: Scene
+  keyframeUrl: string
+  voiceByName: Map<string, string>
+  durationSec: number
+  aspect: 'landscape' | 'portrait'
+}
+
+/** Generate one shot's video (audio embedded when the model supports it). */
 export async function generateSceneVideo(
-  scene: Scene,
-  keyframeUrl: string,
-  mappedImageUrls: (string | undefined)[],
-  durationSec: number,
+  args: GenerateSceneVideoArgs,
   onPhase?: (p: QueuePhase) => void,
 ): Promise<{ url: string }> {
-  const { prompt, elements } = buildElementPrompt((scene.visual && scene.visual.trim()) || scene.prompt, mappedImageUrls)
-  return klingVideo(
-    { prompt, startImageUrl: keyframeUrl, durationSec, elements },
+  const model = getVideoModel(args.model)
+  const prompt = buildVideoPrompt(args.scene, args.voiceByName, model.audio)
+  return nativeVideo(
+    { model: args.model, prompt, startImageUrl: args.keyframeUrl, durationSec: args.durationSec, aspect: args.aspect },
     onPhase ? { onProgress: onPhase } : {},
   )
-}
-
-/**
- * Fuse a scene's silent video + its audio into ONE combined clip. Tries LatentSync (real
- * lip-sync) first; if it fails — most often a `face_detection_error` on stylized/animal or
- * faceless (narrator) shots — falls back to a plain ffmpeg mux so we still return a single
- * combined file (with kling's own generic mouth motion) instead of separate video + audio.
- */
-export async function lipSyncScene(
-  videoUrl: string,
-  audioUrl: string,
-  onPhase?: (p: QueuePhase) => void,
-): Promise<{ url: string }> {
-  const opts = onPhase ? { onProgress: onPhase } : {}
-  try {
-    return await latentSync({ videoUrl, audioUrl }, opts)
-  } catch {
-    return mergeAudioVideo({ videoUrl, audioUrl }, opts)
-  }
 }
