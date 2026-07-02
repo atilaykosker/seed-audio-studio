@@ -109,7 +109,7 @@ export const useStore = create<Store>((set, get) => ({
 
   model: localStorage.getItem(MODEL_KEY) ?? DEFAULT_MODEL,
   videoModel: _active0?.videoModel ?? localStorage.getItem(VIDEO_MODEL_KEY) ?? DEFAULT_VIDEO_MODEL,
-  brief: _active0 ? _active0.brief : DEFAULT_BRIEF,
+  brief: _active0 ? { ...DEFAULT_BRIEF, ..._active0.brief } : DEFAULT_BRIEF,
   characterLibrary: loadCharacterLibrary(),
 
   sessions: _sessions0,
@@ -209,7 +209,7 @@ export const useStore = create<Store>((set, get) => ({
     localStorage.setItem(ACTIVE_KEY, id)
     set({
       activeSessionId: id,
-      brief: sess.brief,
+      brief: { ...DEFAULT_BRIEF, ...sess.brief },
       plan: sess.plan,
       bioPlan: sess.bioPlan ?? null,
       category: sess.category,
