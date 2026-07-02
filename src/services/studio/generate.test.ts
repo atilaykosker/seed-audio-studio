@@ -1,136 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { seedAudio, uploadAsset } = vi.hoisted(() => ({ seedAudio: vi.fn(), uploadAsset: vi.fn() }))
-vi.mock('@/services/fal/client', () => ({ seedAudio, uploadAsset }))
-vi.mock('@/services/audio/trim', () => ({ fetchAndTrim: vi.fn(async () => new Blob()) }))
-
-const { mintCharacterImage, sceneKeyframe } = vi.hoisted(() => ({ mintCharacterImage: vi.fn(), sceneKeyframe: vi.fn() }))
-vi.mock('./image', () => ({ mintCharacterImage, sceneKeyframe }))
-
-const { generateSceneVideo, lipSyncScene } = vi.hoisted(() => ({ generateSceneVideo: vi.fn(), lipSyncScene: vi.fn() }))
-vi.mock('./video', () => ({ generateSceneVideo, lipSyncScene }))
+vi.mock('./image', () => ({
+  mintCharacterImage: vi.fn(async (c: { name: string }) => ({ id: c.name, name: c.name, url: `img:${c.name}`, source: 'minted', createdAt: 0 })),
+  sceneKeyframe: vi.fn(async () => 'keyframe-url'),
+}))
+vi.mock('./video', () => ({
+  generateSceneVideo: vi.fn(async () => ({ url: 'video-url' })),
+}))
 
 import { generateFromPlan } from './generate'
+import { mintCharacterImage, sceneKeyframe } from './image'
+import { generateSceneVideo } from './video'
 import type { Plan } from '@/lib/types'
 
-beforeEach(() => {
-  seedAudio.mockReset(); uploadAsset.mockReset(); mintCharacterImage.mockReset(); sceneKeyframe.mockReset(); generateSceneVideo.mockReset(); lipSyncScene.mockReset()
-  seedAudio.mockResolvedValue({ url: 'https://audio', duration: 9 })
-  uploadAsset.mockResolvedValue('https://hosted')
-})
-
 const plan: Plan = {
-  category: 'Drama',
-  characters: [{ name: 'A', voiceSpec: 's', refPrompt: 'r', appearance: 'tall' }],
-  scenes: [{ id: 'sc1', kind: 'TA2A', title: 't', speakers: ['A'], prompt: 'p', visual: 'wide' }],
+  category: 'Cartoon',
+  characters: [
+    { name: 'Rio', appearance: 'girl', voice: 'bright' },
+    { name: 'Bo', appearance: 'robot', voice: 'deep' },
+  ],
+  scenes: [{ id: 's1', title: 'Meet', speakers: ['Rio', 'Bo'], visual: 'park', dialogue: 'Rio: "Hi"' }],
 }
 
-describe('generateFromPlan (video mode)', () => {
-  it('mints a character image, builds a keyframe, and generates a scene video', async () => {
-    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
-    sceneKeyframe.mockResolvedValue('https://key')
-    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
+beforeEach(() => vi.clearAllMocks())
 
-    const onSceneVideo = vi.fn()
-    const onCharacterImage = vi.fn()
-    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, { onCharacterImage, onSceneVideo })
-
-    expect(onCharacterImage).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://charA' }))
-    expect(sceneKeyframe).toHaveBeenCalledWith(plan.scenes[0], ['https://charA'])
-    expect(generateSceneVideo).toHaveBeenCalledWith(plan.scenes[0], 'https://key', ['https://charA'], 9, expect.any(Function))
-    expect(onSceneVideo).toHaveBeenCalledWith('sc1', 'https://vid')
-  })
-
-  it('skips all image/video work when withVideo is false', async () => {
-    await generateFromPlan(plan, { library: [], withVideo: false }, {})
-    expect(mintCharacterImage).not.toHaveBeenCalled()
-    expect(sceneKeyframe).not.toHaveBeenCalled()
-    expect(generateSceneVideo).not.toHaveBeenCalled()
-  })
-
-  it('reuses a character image from the library instead of minting', async () => {
-    sceneKeyframe.mockResolvedValue('https://key')
-    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
+describe('generateFromPlan', () => {
+  it('mints only missing character images and renders each shot', async () => {
+    const scenes: string[] = []
     await generateFromPlan(
       plan,
-      { library: [], characterLibrary: [{ id: 'x', name: 'a', url: 'https://libA', source: 'minted', createdAt: 0 }], withVideo: true },
-      {},
+      { characterLibrary: [{ id: 'x', name: 'Rio', url: 'lib:Rio', source: 'uploaded', createdAt: 0 }], videoModel: 'bytedance/seedance-2.0/image-to-video', aspect: 'landscape' },
+      { onScene: (id) => scenes.push(id) },
     )
-    expect(mintCharacterImage).not.toHaveBeenCalled()
-    expect(sceneKeyframe).toHaveBeenCalledWith(plan.scenes[0], ['https://libA'])
-  })
-
-  it('a video failure does not stop audio (onError scoped video:)', async () => {
-    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
-    sceneKeyframe.mockRejectedValue(new Error('boom'))
-    const onScene = vi.fn()
-    const onError = vi.fn()
-    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, { onScene, onError })
-    expect(onScene).toHaveBeenCalledWith('sc1', { url: 'https://audio', durationSec: 9 })
-    expect(onError).toHaveBeenCalledWith(expect.stringContaining('video:sc1'), expect.any(String))
-  })
-
-  it('passes a speaker-aligned image array (gap for a missing/narrator speaker) to the video step', async () => {
-    const twoSpeakerPlan: Plan = {
-      category: 'Drama',
-      characters: [
-        { name: 'A', voiceSpec: 's', refPrompt: 'r', appearance: 'tall' },
-        { name: 'B', voiceSpec: 's', refPrompt: 'r', appearance: 'short' },
-      ],
-      scenes: [{ id: 'sc1', kind: 'TA2A', title: 't', speakers: ['A', 'B'], prompt: 'p', visual: 'wide' }],
-    }
-    sceneKeyframe.mockResolvedValue('https://key')
-    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
-
-    // Only B's image resolves (via characterLibrary); A's is missing entirely.
-    await generateFromPlan(
-      twoSpeakerPlan,
-      { library: [], characterLibrary: [{ id: 'x', name: 'B', url: 'https://charB', source: 'minted', createdAt: 0 }], withVideo: true },
-      {},
-    )
-
-    expect(sceneKeyframe).toHaveBeenCalledWith(twoSpeakerPlan.scenes[0], ['https://charB'])
-    // Aligned to speakers [A, B]: A's image is missing (undefined), B resolved.
-    // generateSceneVideo renumbers @ElementN and drops the gap internally.
-    expect(generateSceneVideo).toHaveBeenCalledWith(
-      twoSpeakerPlan.scenes[0],
-      'https://key',
-      [undefined, 'https://charB'],
-      9,
-      expect.any(Function),
-    )
-  })
-
-  it('lip-syncs the scene video with its audio when both succeed', async () => {
-    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
-    sceneKeyframe.mockResolvedValue('https://key')
-    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
-    lipSyncScene.mockResolvedValue({ url: 'https://combined' })
-    const onLipSync = vi.fn()
-    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, { onLipSync })
-    // audio url 'https://audio' (seedAudio mock) + video url 'https://vid'
-    expect(lipSyncScene).toHaveBeenCalledWith('https://vid', 'https://audio', expect.any(Function))
-    expect(onLipSync).toHaveBeenCalledWith('sc1', 'https://combined')
-  })
-
-  it('does not lip-sync when the video step failed', async () => {
-    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
-    sceneKeyframe.mockRejectedValue(new Error('boom')) // video path throws before producing a url
-    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, {})
-    expect(lipSyncScene).not.toHaveBeenCalled()
-  })
-
-  it('a lip-sync failure is scoped and keeps the audio/video results', async () => {
-    mintCharacterImage.mockResolvedValue({ id: 'i1', name: 'A', url: 'https://charA', source: 'minted', createdAt: 0 })
-    sceneKeyframe.mockResolvedValue('https://key')
-    generateSceneVideo.mockResolvedValue({ url: 'https://vid' })
-    lipSyncScene.mockRejectedValue(new Error('no face'))
-    const onScene = vi.fn()
-    const onSceneVideo = vi.fn()
-    const onError = vi.fn()
-    await generateFromPlan(plan, { library: [], characterLibrary: [], withVideo: true }, { onScene, onSceneVideo, onError })
-    expect(onScene).toHaveBeenCalledWith('sc1', { url: 'https://audio', durationSec: 9 })
-    expect(onSceneVideo).toHaveBeenCalledWith('sc1', 'https://vid')
-    expect(onError).toHaveBeenCalledWith(expect.stringContaining('lipsync:sc1'), expect.any(String))
+    // Rio is in the library, only Bo is minted.
+    expect((mintCharacterImage as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0].name)).toEqual(['Bo'])
+    expect(sceneKeyframe).toHaveBeenCalledTimes(1)
+    expect(generateSceneVideo).toHaveBeenCalledTimes(1)
+    expect(scenes).toEqual(['s1'])
   })
 })
