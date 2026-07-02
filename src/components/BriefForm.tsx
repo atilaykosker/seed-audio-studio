@@ -96,7 +96,7 @@ export function BriefForm() {
         <div className="space-y-2">
           <Label>Orientation</Label>
           <Select
-            value={brief.aspect}
+            value={brief.aspect ?? 'landscape'}
             onValueChange={(v) => setBrief({ aspect: v as 'landscape' | 'portrait' })}
           >
             <SelectTrigger>

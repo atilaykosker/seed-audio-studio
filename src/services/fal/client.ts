@@ -277,7 +277,7 @@ export function buildVideoInput(model: VideoModel, args: Omit<NativeVideoArgs, '
       start_image_url: args.startImageUrl,
       duration: String(seconds),
       aspect_ratio: aspect,
-      generate_audio: false,
+      generate_audio: model.audio,
     }
   }
 

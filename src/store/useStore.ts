@@ -105,7 +105,7 @@ export const useStore = create<Store>((set, get) => ({
   toasts: [],
 
   model: localStorage.getItem(MODEL_KEY) ?? DEFAULT_MODEL,
-  videoModel: localStorage.getItem(VIDEO_MODEL_KEY) ?? DEFAULT_VIDEO_MODEL,
+  videoModel: _active0?.videoModel ?? localStorage.getItem(VIDEO_MODEL_KEY) ?? DEFAULT_VIDEO_MODEL,
   brief: _active0 ? _active0.brief : DEFAULT_BRIEF,
   characterLibrary: loadCharacterLibrary(),
 
