@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "tsc -b tsconfig.app.json tsconfig.node.json && tsc -b",
     "next:dev": "next dev",
     "next:build": "next build",
     "next:start": "next start"

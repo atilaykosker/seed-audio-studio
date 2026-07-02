@@ -15,6 +15,8 @@
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // TS 6.0 flipped this default to true, which breaks the side-effect
+    // import of ./globals.css in app/layout.tsx. Keep it false.
     "noUncheckedSideEffectImports": false
   },
   "include": ["next-env.d.ts", "app/**/*", "middleware.ts", "src/server/**/*", ".next/types/**/*.ts"],
