@@ -9,7 +9,7 @@
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "paths": { "@/*": ["./*"] },
+    "paths": { "@/*": ["./*", "./src/*"] },
     "plugins": [{ "name": "next" }],
     "allowJs": true,
     "incremental": true,
