@@ -2,9 +2,9 @@ import { create } from 'zustand'
 import { uid, sessionTitle } from '@/lib/utils'
 import { mapFalError } from '@/services/fal/errors'
 import { DEFAULT_MODEL, DEFAULT_VIDEO_MODEL, type VideoModelId } from '@/services/fal/client'
-import { makePlan } from '@/services/studio/plan'
-import { generateFromPlan, generateSceneClip } from '@/services/studio/generate'
-import type { Brief, Clip, CharacterImage, Plan, Session, StudioStatus } from '@/lib/types'
+import { makePlan, makeBioPlan } from '@/services/studio/plan'
+import { generateFromPlan, generateSceneClip, generateBiography, generateBioShot } from '@/services/studio/generate'
+import type { Brief, Clip, CharacterImage, BiographyPlan, Plan, Session, StudioStatus } from '@/lib/types'
 
 const MODEL_KEY = 'seed-audio-studio:model'
 const VIDEO_MODEL_KEY = 'seed-audio-studio:videoModel'
@@ -48,6 +48,8 @@ const DEFAULT_BRIEF: Brief = {
   speakers: 'auto',
   genre: '',
   aspect: 'landscape',
+  type: 'story',
+  shotSec: 8,
 }
 
 interface Store {
@@ -64,6 +66,7 @@ interface Store {
   activeSessionId: string | null
 
   plan: Plan | null
+  bioPlan: BiographyPlan | null
   category: string | null
   clips: Clip[]
   status: StudioStatus
@@ -113,6 +116,7 @@ export const useStore = create<Store>((set, get) => ({
   activeSessionId: _active0 ? _activeId0 : null,
 
   plan: _active0?.plan ?? null,
+  bioPlan: _active0?.bioPlan ?? null,
   category: _active0?.category ?? null,
   clips: _active0?.clips ?? [],
   status: _active0 && _active0.clips.length ? 'done' : 'idle',
@@ -161,6 +165,7 @@ export const useStore = create<Store>((set, get) => ({
       updatedAt: now,
       brief: s.brief,
       plan: null,
+      bioPlan: null,
       category: null,
       clips: [],
       videoModel: s.videoModel,
@@ -181,7 +186,7 @@ export const useStore = create<Store>((set, get) => ({
     if (!s.activeSessionId) return
     const next = s.sessions.map((x) =>
       x.id === s.activeSessionId
-        ? { ...x, brief: s.brief, plan: s.plan, category: s.category, clips: s.clips, videoModel: s.videoModel, updatedAt: Date.now() }
+        ? { ...x, brief: s.brief, plan: s.plan, bioPlan: s.bioPlan, category: s.category, clips: s.clips, videoModel: s.videoModel, updatedAt: Date.now() }
         : x,
     )
     try {
@@ -195,7 +200,7 @@ export const useStore = create<Store>((set, get) => ({
 
   newSession: () => {
     localStorage.removeItem(ACTIVE_KEY)
-    set({ activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, category: null, clips: [], status: 'idle', currentStep: null })
+    set({ activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, bioPlan: null, category: null, clips: [], status: 'idle', currentStep: null })
   },
 
   loadSession: (id) => {
@@ -206,6 +211,7 @@ export const useStore = create<Store>((set, get) => ({
       activeSessionId: id,
       brief: sess.brief,
       plan: sess.plan,
+      bioPlan: sess.bioPlan ?? null,
       category: sess.category,
       clips: sess.clips,
       videoModel: sess.videoModel ?? get().videoModel,
@@ -236,12 +242,12 @@ export const useStore = create<Store>((set, get) => ({
       }
       if (s.activeSessionId === id) {
         localStorage.removeItem(ACTIVE_KEY)
-        return { sessions: next, activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, category: null, clips: [], status: 'idle', currentStep: null }
+        return { sessions: next, activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, bioPlan: null, category: null, clips: [], status: 'idle', currentStep: null }
       }
       return { sessions: next }
     }),
 
-  clearResults: () => set({ plan: null, category: null, clips: [], status: 'idle', currentStep: null }),
+  clearResults: () => set({ plan: null, bioPlan: null, category: null, clips: [], status: 'idle', currentStep: null }),
 
   runStudio: async () => {
     const { key, brief, model, videoModel } = get()
@@ -254,7 +260,65 @@ export const useStore = create<Store>((set, get) => ({
       return
     }
     get().beginSession()
-    set({ status: 'planning', currentStep: 'Planning shots…', plan: null, clips: [] })
+
+    const patchClipByScene = (sceneId: string, patch: Partial<Clip>) =>
+      set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...patch } : c)) }))
+
+    if (brief.type === 'biography') {
+      set({ status: 'planning', currentStep: 'Planning biography…', plan: null, bioPlan: null, clips: [] })
+      let bio: BiographyPlan
+      try {
+        bio = await makeBioPlan(brief, model)
+      } catch (e) {
+        const fe = mapFalError(e)
+        set({ status: 'error', currentStep: null })
+        get().toast({ kind: 'error', title: fe.title, message: fe.message })
+        return
+      }
+      const clips: Clip[] = bio.pages.flatMap((page) =>
+        page.shots.map((shot, i) => ({
+          id: uid(),
+          sceneId: shot.id,
+          title: `Page ${page.index} · Shot ${i + 1}`,
+          speakers: [],
+          prompt: shot.visual,
+          status: 'pending' as const,
+        })),
+      )
+      set({ bioPlan: bio, category: 'Biography', clips, status: 'generating' })
+      get().saveActiveSession()
+
+      await generateBiography(
+        bio,
+        { characterLibrary: get().characterLibrary, videoModel: videoModel as VideoModelId, aspect: brief.aspect, shotSec: brief.shotSec },
+        {
+          onCharacterImage: (img) => get().addCharacterImage(img),
+          onSceneStart: (sceneId) => {
+            set({ currentStep: 'Generating shot…' })
+            patchClipByScene(sceneId, { status: 'running' })
+          },
+          onKeyframe: (sceneId, url) => patchClipByScene(sceneId, { imageUrl: url }),
+          onScenePhase: (sceneId, phase) => patchClipByScene(sceneId, { phase }),
+          onScene: (sceneId, r) => {
+            patchClipByScene(sceneId, { status: 'done', videoUrl: r.url })
+            get().saveActiveSession()
+          },
+          onError: (scope, message) => {
+            if (scope.startsWith('scene:')) {
+              patchClipByScene(scope.slice('scene:'.length), { status: 'error', error: message })
+            } else {
+              get().toast({ kind: 'error', title: 'Generation issue', message })
+            }
+          },
+        },
+      )
+      set({ status: 'done', currentStep: null })
+      get().saveActiveSession()
+      return
+    }
+
+    // story
+    set({ status: 'planning', currentStep: 'Planning shots…', plan: null, bioPlan: null, clips: [] })
     let plan: Plan
     try {
       plan = await makePlan(brief, model)
@@ -275,9 +339,6 @@ export const useStore = create<Store>((set, get) => ({
     }))
     set({ plan, category: plan.category, clips, status: 'generating' })
     get().saveActiveSession()
-
-    const patchClipByScene = (sceneId: string, patch: Partial<Clip>) =>
-      set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...patch } : c)) }))
 
     await generateFromPlan(
       plan,
@@ -308,12 +369,39 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   regenScene: async (sceneId) => {
-    const { plan, characterLibrary, brief, videoModel } = get()
+    const { plan, bioPlan, characterLibrary, brief, videoModel } = get()
+    const patch = (p: Partial<Clip>) =>
+      set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...p } : c)) }))
+
+    if (brief.type === 'biography' && bioPlan) {
+      const shot = bioPlan.pages.flatMap((pg) => pg.shots).find((sh) => sh.id === sceneId)
+      if (!shot) return
+      patch({ status: 'running', error: undefined, videoUrl: undefined, imageUrl: undefined, phase: undefined })
+      try {
+        const libByName = new Map<string, string>()
+        for (const img of characterLibrary) libByName.set(img.name.toLowerCase(), img.url)
+        const stageImageById = new Map<string, string>()
+        for (const stage of bioPlan.stages) {
+          const url = libByName.get(`${bioPlan.subject} — ${stage.label}`.toLowerCase())
+          if (url) stageImageById.set(stage.id, url)
+        }
+        const r = await generateBioShot(
+          { shot, stageImageById, style: bioPlan.style, videoModel: videoModel as VideoModelId, aspect: brief.aspect, shotSec: brief.shotSec },
+          { onKeyframe: (_id, url) => patch({ imageUrl: url }), onScenePhase: (_id, phase) => patch({ phase }) },
+        )
+        patch({ status: 'done', videoUrl: r.url })
+      } catch (e) {
+        const fe = mapFalError(e)
+        patch({ status: 'error', error: fe.message })
+        get().toast({ kind: 'error', title: fe.title, message: fe.message })
+      }
+      get().saveActiveSession()
+      return
+    }
+
     if (!plan) return
     const scene = plan.scenes.find((s) => s.id === sceneId)
     if (!scene) return
-    const patch = (p: Partial<Clip>) =>
-      set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...p } : c)) }))
     patch({ status: 'running', error: undefined, videoUrl: undefined, imageUrl: undefined, phase: undefined })
     try {
       const imageByName = new Map<string, string>()
