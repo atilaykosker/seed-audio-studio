@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Download, RefreshCw, ChevronDown, Loader2, AlertCircle } from 'lucide-react'
-import { Button, Card, CardContent } from '@/components/ui'
+import { Button, Card, CardContent, Textarea } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import type { Clip } from '@/lib/types'
 
 export function ClipCard({ clip }: { clip: Clip }) {
   const regen = useStore((s) => s.regenScene)
+  const editClipPrompt = useStore((s) => s.editClipPrompt)
   const [showPrompt, setShowPrompt] = useState(false)
+  const [draft, setDraft] = useState(clip.prompt)
   const [mediaError, setMediaError] = useState(false)
   useEffect(() => setMediaError(false), [clip.videoUrl])
+  // Keep the editable draft in sync when the clip's prompt changes (regen, session load).
+  useEffect(() => setDraft(clip.prompt), [clip.prompt])
   const busy = clip.status === 'running'
+
+  const regenerate = () => {
+    if (draft !== clip.prompt) editClipPrompt(clip.sceneId, draft)
+    regen(clip.sceneId)
+  }
 
   return (
     <Card>
@@ -60,15 +69,22 @@ export function ClipCard({ clip }: { clip: Clip }) {
               </Button>
             </a>
           )}
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => regen(clip.sceneId)}>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={regenerate}>
             <RefreshCw className="size-4" /> Regenerate
           </Button>
         </div>
 
         {showPrompt && (
-          <pre className="text-xs whitespace-pre-wrap bg-muted/50 rounded-md p-3 border border-border/60 text-muted-foreground">
-            {clip.prompt}
-          </pre>
+          <div className="space-y-1">
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={4}
+              className="text-xs"
+              placeholder="Edit the prompt, then Regenerate…"
+            />
+            <p className="text-[11px] text-muted-foreground">Edit and hit Regenerate — the text is sent to the model as-is.</p>
+          </div>
         )}
       </CardContent>
     </Card>
