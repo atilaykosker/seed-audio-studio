@@ -42,3 +42,36 @@ export async function generateSceneVideo(
     onPhase ? { onProgress: onPhase } : {},
   )
 }
+
+/** Compose a biography shot's silent prompt: global style + the shot's visual (no dialogue). */
+export function buildBioVideoPrompt(style: string, visual: string): string {
+  return [style.trim(), visual.trim()].filter(Boolean).join('\n')
+}
+
+export interface GenerateBioShotArgs {
+  model: VideoModelId
+  style: string
+  visual: string
+  keyframeUrl: string
+  durationSec: number
+  aspect: 'landscape' | 'portrait'
+}
+
+/** Generate one SILENT biography shot video (audio forced off on any model). */
+export async function generateBioShotVideo(
+  args: GenerateBioShotArgs,
+  onPhase?: (p: QueuePhase) => void,
+): Promise<{ url: string }> {
+  const prompt = buildBioVideoPrompt(args.style, args.visual)
+  return nativeVideo(
+    {
+      model: args.model,
+      prompt,
+      startImageUrl: args.keyframeUrl,
+      durationSec: args.durationSec,
+      aspect: args.aspect,
+      forceSilent: true,
+    },
+    onPhase ? { onProgress: onPhase } : {},
+  )
+}

@@ -1,7 +1,7 @@
 import type { QueuePhase, VideoModelId } from '@/services/fal/client'
-import { mintCharacterImage, sceneKeyframe } from './image'
-import { generateSceneVideo } from './video'
-import type { CharacterImage, Plan, Scene } from '@/lib/types'
+import { bioKeyframe, mintCharacterImage, mintStageImage, sceneKeyframe } from './image'
+import { generateBioShotVideo, generateSceneVideo } from './video'
+import type { BiographyPlan, BioShot, CharacterImage, Plan, Scene } from '@/lib/types'
 
 export interface GenerateCallbacks {
   onCharacterImage?: (img: CharacterImage) => void
@@ -83,6 +83,82 @@ export async function generateFromPlan(
       cb.onScene?.(scene.id, r)
     } catch (e) {
       cb.onError?.(`scene:${scene.id}`, e instanceof Error ? e.message : String(e))
+    }
+  }
+}
+
+export interface BioClipArgs {
+  shot: BioShot
+  /** stageId → minted portrait URL. */
+  stageImageById: Map<string, string>
+  style: string
+  videoModel: VideoModelId
+  aspect: 'landscape' | 'portrait'
+  shotSec: number
+}
+
+/** Render one biography shot: stage-conditioned keyframe → silent video. Reused by run + regen. */
+export async function generateBioShot(
+  args: BioClipArgs,
+  cb: Pick<GenerateCallbacks, 'onKeyframe' | 'onScenePhase'> = {},
+): Promise<{ url: string }> {
+  const stageUrl = args.shot.stageId ? args.stageImageById.get(args.shot.stageId) : undefined
+  const keyframe = await bioKeyframe(args.shot.visual, stageUrl ? [stageUrl] : [], args.style, args.aspect)
+  cb.onKeyframe?.(args.shot.id, keyframe)
+  return generateBioShotVideo(
+    {
+      model: args.videoModel,
+      style: args.style,
+      visual: args.shot.visual,
+      keyframeUrl: keyframe,
+      durationSec: args.shotSec,
+      aspect: args.aspect,
+    },
+    (p) => cb.onScenePhase?.(args.shot.id, p),
+  )
+}
+
+/**
+ * Full biography pipeline: mint any missing per-stage reference portraits (reuse the library
+ * by "<subject> — <stage label>"), then render every shot (silent) in page order.
+ */
+export async function generateBiography(
+  plan: BiographyPlan,
+  args: { characterLibrary?: CharacterImage[]; videoModel: VideoModelId; aspect: 'landscape' | 'portrait'; shotSec: number },
+  cb: GenerateCallbacks = {},
+): Promise<void> {
+  const libByName = new Map<string, string>()
+  for (const img of args.characterLibrary ?? []) libByName.set(img.name.toLowerCase(), img.url)
+
+  const stageImageById = new Map<string, string>()
+  for (const stage of plan.stages) {
+    const name = `${plan.subject} — ${stage.label}`
+    const existing = libByName.get(name.toLowerCase())
+    if (existing) {
+      stageImageById.set(stage.id, existing)
+      continue
+    }
+    try {
+      const img = await mintStageImage(plan.subject, stage, plan.style)
+      cb.onCharacterImage?.(img)
+      stageImageById.set(stage.id, img.url)
+    } catch (e) {
+      cb.onError?.(`image:${name}`, e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  for (const page of plan.pages) {
+    for (const shot of page.shots) {
+      cb.onSceneStart?.(shot.id)
+      try {
+        const r = await generateBioShot(
+          { shot, stageImageById, style: plan.style, videoModel: args.videoModel, aspect: args.aspect, shotSec: args.shotSec },
+          cb,
+        )
+        cb.onScene?.(shot.id, r)
+      } catch (e) {
+        cb.onError?.(`scene:${shot.id}`, e instanceof Error ? e.message : String(e))
+      }
     }
   }
 }
