@@ -3,6 +3,14 @@ import type { Brief, BiographyPlan, BioPage, BioShot, BioStage, Plan, Scene } fr
 import { uid } from '@/lib/utils'
 import { DIRECTOR_GUIDE, OUTPUT_DIRECTIVE, BIOGRAPHY_GUIDE, BIO_OUTPUT_DIRECTIVE } from './guide'
 
+/**
+ * Output token budget for a plan. A full biography (or a long multi-scene story) can run
+ * to several thousand tokens of JSON; too small a cap truncates the response mid-array so
+ * `JSON.parse` fails with "Expected ',' or ']' after array element". 8000 gives ample room
+ * within every picker model's output limit.
+ */
+const PLAN_MAX_TOKENS = 8000
+
 export function buildPlanPrompt(b: Brief): string {
   const speakers =
     b.speakers === 'auto'
@@ -71,7 +79,7 @@ export async function makePlan(brief: Brief, model: string, opts: RunOptions = {
   const attempt = async (extra = '') =>
     parsePlan(
       await llmText(
-        { systemPrompt: systemBase + extra, prompt: userPrompt, model, temperature: 0.7, maxTokens: 3500 },
+        { systemPrompt: systemBase + extra, prompt: userPrompt, model, temperature: 0.7, maxTokens: PLAN_MAX_TOKENS },
         opts,
       ),
     )
@@ -134,7 +142,7 @@ export async function makeBioPlan(brief: Brief, model: string, opts: RunOptions 
   const attempt = async (extra = '') =>
     parseBioPlan(
       await llmText(
-        { systemPrompt: systemBase + extra, prompt: userPrompt, model, temperature: 0.7, maxTokens: 3500 },
+        { systemPrompt: systemBase + extra, prompt: userPrompt, model, temperature: 0.7, maxTokens: PLAN_MAX_TOKENS },
         opts,
       ),
     )
