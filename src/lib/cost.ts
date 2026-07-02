@@ -1,31 +1,22 @@
 import type { Plan } from './types'
+import { getVideoModel } from '@/services/fal/client'
 
-/** seed-audio-1.0 price: $0.1875 per minute of generated audio. */
-const PER_MIN = 0.1875
-
-/** nano-banana image price ($/image) and kling v3 i2v price ($/sec, audio off). */
+/** nano-banana image price ($/image), for characters + shot keyframes. */
 const IMAGE_EACH = 0.039
-const VIDEO_PER_SEC = 0.112
-/** Assumed kling clip length used for pre-generation estimates. */
-const VIDEO_SEC = 10
-/** LatentSync lip-sync price: ~$0.20 flat per clip (<=40s). */
-const LIPSYNC_EACH = 0.2
 
-/** Rough cost estimate for a plan: mint clips (~25s each) + scene clips, plus images+video when withVideo. */
-export function estimatePlanCost(plan: Plan, targetDurationSec: number, withVideo = false): number {
-  const mintSeconds = plan.characters.length * 25
-  const sceneSeconds = Math.max(plan.scenes.length, 1) * Math.min(targetDurationSec, 120)
-  const audio = ((mintSeconds + sceneSeconds) / 60) * PER_MIN
-  if (!withVideo) return audio
-  const images = (plan.characters.length + plan.scenes.length) * IMAGE_EACH
-  const video = plan.scenes.length * VIDEO_SEC * VIDEO_PER_SEC
-  const lipsync = plan.scenes.length * LIPSYNC_EACH
-  return audio + images + video + lipsync
+/** Cost of one generated shot on a model at a given duration (seconds). */
+export function clipCost(videoModel: string, durationSec: number): number {
+  return getVideoModel(videoModel).pricePerSec * durationSec
 }
 
-/** Cost of a single generated clip given its duration in seconds. */
-export function clipCost(durationSec: number): number {
-  return (durationSec / 60) * PER_MIN
+/**
+ * Rough cost estimate: one reference image per character + one keyframe per shot, plus
+ * each shot's video at the selected model's per-second price.
+ */
+export function estimatePlanCost(plan: Plan, videoModel: string, shotSec = 8): number {
+  const images = (plan.characters.length + plan.scenes.length) * IMAGE_EACH
+  const video = plan.scenes.length * shotSec * getVideoModel(videoModel).pricePerSec
+  return images + video
 }
 
 export function formatUSD(n: number): string {

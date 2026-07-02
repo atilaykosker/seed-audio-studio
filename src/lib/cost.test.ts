@@ -1,30 +1,34 @@
 import { describe, it, expect } from 'vitest'
-import { estimatePlanCost } from './cost'
+import { estimatePlanCost, clipCost, formatUSD } from './cost'
+import { getVideoModel } from '@/services/fal/client'
 import type { Plan } from './types'
 
 const plan: Plan = {
-  category: 'Podcast',
-  characters: [
-    { name: 'A', voiceSpec: '', refPrompt: 'x' },
-    { name: 'B', voiceSpec: '', refPrompt: 'y' },
-  ],
+  category: 'Cartoon',
+  characters: [{ name: 'Rio', appearance: 'girl', voice: 'bright' }],
   scenes: [
-    { id: '1', kind: 'T2A', title: 's1', speakers: [], prompt: 'p' },
-    { id: '2', kind: 'T2A', title: 's2', speakers: [], prompt: 'p' },
+    { id: 's1', title: 'A', speakers: ['Rio'], visual: 'v', dialogue: 'd' },
+    { id: 's2', title: 'B', speakers: [], visual: 'v', dialogue: '' },
   ],
 }
 
-describe('estimatePlanCost', () => {
-  it('matches the audio-only estimate when withVideo is false', () => {
-    // 2 chars * 25s mint + 2 scenes * 40s = 130s -> 130/60 * 0.1875
-    expect(estimatePlanCost(plan, 40)).toBeCloseTo((130 / 60) * 0.1875, 5)
+describe('cost', () => {
+  it('clipCost = price/sec * duration for the model', () => {
+    const m = getVideoModel('bytedance/seedance-2.0/image-to-video')
+    expect(clipCost(m.id, 8)).toBeCloseTo(m.pricePerSec * 8, 5)
   })
 
-  it('adds nano-banana (per char + per scene), kling seconds, and lip-sync when withVideo', () => {
-    const audio = (130 / 60) * 0.1875
-    const images = (2 + 2) * 0.039 // 2 char images + 2 scene keyframes
-    const video = 2 * 10 * 0.112 // 2 scenes * 10s * $/s
-    const lipsync = 2 * 0.2 // 2 scenes * $0.20 LatentSync
-    expect(estimatePlanCost(plan, 40, true)).toBeCloseTo(audio + images + video + lipsync, 5)
+  it('estimatePlanCost = images + shots * shotSec * price/sec', () => {
+    const m = getVideoModel('fal-ai/veo3.1/image-to-video')
+    const est = estimatePlanCost(plan, m.id, 8)
+    const IMAGE_EACH = 0.039
+    const images = (plan.characters.length + plan.scenes.length) * IMAGE_EACH
+    const video = plan.scenes.length * 8 * m.pricePerSec
+    expect(est).toBeCloseTo(images + video, 5)
+  })
+
+  it('formatUSD floors tiny values', () => {
+    expect(formatUSD(0.004)).toBe('<$0.01')
+    expect(formatUSD(1.5)).toBe('$1.50')
   })
 })
