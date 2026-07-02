@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Clapperboard, Loader2, Menu } from 'lucide-react'
-import { Badge, Card, CardContent, Separator } from '@/components/ui'
+import { Clapperboard, Loader2, Menu, Copy } from 'lucide-react'
+import { Badge, Button, Card, CardContent, Separator } from '@/components/ui'
 import { BriefForm } from '@/components/BriefForm'
 import { CharacterLibraryPanel } from '@/components/CharacterLibraryPanel'
 import { ClipCard } from '@/components/ClipCard'
 import { SessionSidebar } from '@/components/SessionSidebar'
 import { useStore } from '@/store/useStore'
-import { estimatePlanCost, formatUSD } from '@/lib/cost'
+import { estimateBioCost, estimatePlanCost, formatUSD } from '@/lib/cost'
 import { cn } from '@/lib/utils'
+import type { Clip } from '@/lib/types'
 
 export function Studio() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -16,7 +17,18 @@ export function Studio() {
   const category = useStore((s) => s.category)
   const clips = useStore((s) => s.clips)
   const plan = useStore((s) => s.plan)
+  const bioPlan = useStore((s) => s.bioPlan)
+  const brief = useStore((s) => s.brief)
   const videoModel = useStore((s) => s.videoModel)
+
+  const clipByScene = new Map<string, Clip>(clips.map((c) => [c.sceneId, c]))
+  const copy = (text: string) => navigator.clipboard?.writeText(text).catch(() => {})
+
+  const estCost = bioPlan
+    ? estimateBioCost(bioPlan, videoModel, brief.shotSec)
+    : plan
+      ? estimatePlanCost(plan, videoModel)
+      : null
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -61,9 +73,9 @@ export function Studio() {
                 <span className="text-muted-foreground">
                   {currentStep ?? (status === 'done' ? 'Done.' : status === 'error' ? 'Failed.' : '')}
                 </span>
-                {plan && (
+                {estCost != null && (
                   <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
-                    Est. cost: {formatUSD(estimatePlanCost(plan, videoModel))}
+                    Est. cost: {formatUSD(estCost)}
                   </span>
                 )}
               </div>
@@ -74,10 +86,41 @@ export function Studio() {
                 <Clapperboard className="size-8 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Describe a video on the left and hit Generate.</p>
                 <p className="text-xs mt-1">
-                  The model plans short shots, mints a reference image per character, and renders each shot as a video
-                  with native audio.
+                  Story mode renders multi-character shots with native audio; Biography mode renders silent shots of a
+                  person's life — add your narration afterward.
                 </p>
               </div>
+            ) : bioPlan ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <Separator className="flex-1" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-2 shrink-0"
+                    onClick={() => copy(bioPlan.pages.map((p) => p.narration).join('\n\n'))}
+                  >
+                    <Copy className="size-4" /> Copy full script
+                  </Button>
+                </div>
+                {bioPlan.pages.map((page) => (
+                  <div key={page.id} className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-medium text-muted-foreground shrink-0 pt-0.5">Page {page.index}</span>
+                      <p className="text-sm text-foreground/90 flex-1 whitespace-pre-wrap">{page.narration}</p>
+                      <Button variant="ghost" size="sm" className="shrink-0" onClick={() => copy(page.narration)}>
+                        <Copy className="size-4" />
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {page.shots.map((shot) => {
+                        const c = clipByScene.get(shot.id)
+                        return c ? <ClipCard key={shot.id} clip={c} /> : null
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </>
             ) : (
               <>
                 {clips.length > 0 && <Separator />}
