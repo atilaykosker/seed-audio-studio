@@ -71,6 +71,11 @@ output has no sound (accepted per the "cheap/silent models give silent clips" de
 > Exact endpoint ids, param names (e.g. `generate_audio`, `aspect_ratio`, `resolution`,
 > `duration`), and prices are confirmed against fal model docs during implementation.
 
+Each `VIDEO_MODELS` entry also carries a short `description` (one line: what it's good
+for / tradeoff). The picker **displays label + description + price ($/sec)** next to
+every option (and native-audio vs silent), so the user sees the cost/quality tradeoff at
+selection time. Estimated per-shot cost (price × duration) is also surfaced.
+
 Store adds `videoModel` state, persisted to `localStorage` alongside `llmModel` /
 fal key (voice library persistence is removed). UI: a picker in `Studio` (near the run
 control / settings). Default = Seedance 2.0.
