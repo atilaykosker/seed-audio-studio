@@ -1,0 +1,11 @@
+{
+  "name": "bookticle-studio",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "vars": {},
+  // Secrets (APP_PASSWORD_HASH, SESSION_SECRET, FAL_KEY, SUPABASE_URL,
+  // SUPABASE_SERVICE_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+  // S3_BUCKET, S3_REGION) are set via `wrangler secret put <NAME>`.
+}
