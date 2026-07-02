@@ -10,8 +10,11 @@ export function ClipCard({ clip }: { clip: Clip }) {
   const [showPrompt, setShowPrompt] = useState(false)
   const [draft, setDraft] = useState(clip.prompt)
   const [mediaError, setMediaError] = useState(false)
+  // Reset media error when new video loads (e.g., after regen).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMediaError(false), [clip.videoUrl])
   // Keep the editable draft in sync when the clip's prompt changes (regen, session load).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setDraft(clip.prompt), [clip.prompt])
   const busy = clip.status === 'running'
 
