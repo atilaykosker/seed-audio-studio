@@ -1,4 +1,4 @@
-import type { Plan } from './types'
+import type { BiographyPlan, Plan } from './types'
 import { getVideoModel } from '@/services/fal/client'
 
 /** nano-banana image price ($/image), for characters + shot keyframes. */
@@ -16,6 +16,14 @@ export function clipCost(videoModel: string, durationSec: number): number {
 export function estimatePlanCost(plan: Plan, videoModel: string, shotSec = 8): number {
   const images = (plan.characters.length + plan.scenes.length) * IMAGE_EACH
   const video = plan.scenes.length * shotSec * getVideoModel(videoModel).pricePerSec
+  return images + video
+}
+
+/** Cost estimate for a biography: one portrait per stage + each shot's silent video. */
+export function estimateBioCost(plan: BiographyPlan, videoModel: string, shotSec: number): number {
+  const shots = plan.pages.reduce((n, p) => n + p.shots.length, 0)
+  const images = plan.stages.length * IMAGE_EACH
+  const video = shots * shotSec * getVideoModel(videoModel).pricePerSec
   return images + video
 }
 

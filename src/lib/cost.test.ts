@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { estimatePlanCost, clipCost, formatUSD } from './cost'
+import { estimatePlanCost, clipCost, formatUSD, estimateBioCost } from './cost'
 import { getVideoModel } from '@/services/fal/client'
-import type { Plan } from './types'
+import type { Plan, BiographyPlan } from './types'
 
 const plan: Plan = {
   category: 'Cartoon',
@@ -30,5 +30,29 @@ describe('cost', () => {
   it('formatUSD floors tiny values', () => {
     expect(formatUSD(0.004)).toBe('<$0.01')
     expect(formatUSD(1.5)).toBe('$1.50')
+  })
+})
+
+const bioPlan: BiographyPlan = {
+  subject: 'Ada',
+  style: 's',
+  stages: [
+    { id: 'a', label: 'child', appearance: 'x' },
+    { id: 'b', label: 'adult', appearance: 'y' },
+  ],
+  pages: [
+    { id: 'p1', index: 1, narration: 'n', shots: [{ id: 's1', visual: 'v' }, { id: 's2', visual: 'v' }] },
+    { id: 'p2', index: 2, narration: 'n', shots: [{ id: 's3', visual: 'v' }] },
+  ],
+}
+
+describe('estimateBioCost', () => {
+  it('= stages*IMAGE_EACH + totalShots*shotSec*pricePerSec', () => {
+    const m = getVideoModel('fal-ai/veo3.1/image-to-video')
+    const est = estimateBioCost(bioPlan, m.id, 6)
+    const IMAGE_EACH = 0.039
+    const images = 2 * IMAGE_EACH // 2 stages
+    const video = 3 * 6 * m.pricePerSec // 3 shots
+    expect(est).toBeCloseTo(images + video, 5)
   })
 })
