@@ -139,3 +139,13 @@ describe('buildVideoInput', () => {
     expect(p.aspect_ratio).toBe(seedance.aspectRatios.portrait)
   })
 })
+
+describe('buildVideoInput forceSilent', () => {
+  it('forces generate_audio off on an audio-capable model when forceSilent is set', () => {
+    const veo = getVideoModel('fal-ai/veo3.1/image-to-video')
+    const seedance = getVideoModel('bytedance/seedance-2.0/image-to-video')
+    expect(buildVideoInput(veo, { prompt: 'p', startImageUrl: 'u' }).generate_audio).toBe(true)
+    expect(buildVideoInput(veo, { prompt: 'p', startImageUrl: 'u', forceSilent: true }).generate_audio).toBe(false)
+    expect(buildVideoInput(seedance, { prompt: 'p', startImageUrl: 'u', forceSilent: true }).generate_audio).toBe(false)
+  })
+})

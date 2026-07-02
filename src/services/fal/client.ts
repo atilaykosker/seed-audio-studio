@@ -253,6 +253,8 @@ export interface NativeVideoArgs {
   startImageUrl: string
   durationSec?: number
   aspect?: 'landscape' | 'portrait'
+  /** Force silent output (no audio) regardless of the model's default. */
+  forceSilent?: boolean
 }
 
 /** veo3.1's `duration` field is a string enum of exactly these second counts. */
@@ -277,7 +279,7 @@ export function buildVideoInput(model: VideoModel, args: Omit<NativeVideoArgs, '
       start_image_url: args.startImageUrl,
       duration: String(seconds),
       aspect_ratio: aspect,
-      generate_audio: model.audio,
+      generate_audio: args.forceSilent ? false : model.audio,
     }
   }
 
@@ -292,7 +294,7 @@ export function buildVideoInput(model: VideoModel, args: Omit<NativeVideoArgs, '
       duration: `${seconds}s`,
       aspect_ratio: aspect,
       resolution: '720p',
-      generate_audio: model.audio,
+      generate_audio: args.forceSilent ? false : model.audio,
     }
   }
 
@@ -304,7 +306,7 @@ export function buildVideoInput(model: VideoModel, args: Omit<NativeVideoArgs, '
     duration: String(seconds),
     aspect_ratio: aspect,
     resolution: '720p',
-    generate_audio: model.audio,
+    generate_audio: args.forceSilent ? false : model.audio,
   }
 }
 
