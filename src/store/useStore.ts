@@ -80,6 +80,7 @@ interface Store {
   setModel: (m: string) => void
   setVideoModel: (m: string) => void
   setBrief: (patch: Partial<Brief>) => void
+  editClipPrompt: (sceneId: string, text: string) => void
 
   addCharacterImage: (img: CharacterImage) => void
   removeCharacterImage: (id: string) => void
@@ -136,6 +137,31 @@ export const useStore = create<Store>((set, get) => ({
     set({ videoModel: m })
   },
   setBrief: (patch) => set((s) => ({ brief: { ...s.brief, ...patch } })),
+
+  editClipPrompt: (sceneId, text) => {
+    set((s) => {
+      const clips = s.clips.map((c) => (c.sceneId === sceneId ? { ...c, prompt: text } : c))
+      if (s.bioPlan) {
+        const bioPlan = {
+          ...s.bioPlan,
+          pages: s.bioPlan.pages.map((pg) => ({
+            ...pg,
+            shots: pg.shots.map((sh) => (sh.id === sceneId ? { ...sh, visual: text } : sh)),
+          })),
+        }
+        return { clips, bioPlan }
+      }
+      if (s.plan) {
+        const plan = {
+          ...s.plan,
+          scenes: s.plan.scenes.map((sc) => (sc.id === sceneId ? { ...sc, visual: text, dialogue: '' } : sc)),
+        }
+        return { clips, plan }
+      }
+      return { clips }
+    })
+    get().saveActiveSession()
+  },
 
   addCharacterImage: (img) =>
     set((s) => {
