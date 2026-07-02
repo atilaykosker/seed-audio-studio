@@ -23,6 +23,7 @@ export interface ClipRow {
   status: 'pending' | 'running' | 'done' | 'error'
   phase: 'queued' | 'running' | 'done' | null
   request_id: string | null
+  request_endpoint: string | null
   image_key: string | null
   video_key: string | null
   duration_sec: number | null

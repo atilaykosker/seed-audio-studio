@@ -23,6 +23,7 @@ create table if not exists clips (
   status       text not null default 'pending',
   phase        text,
   request_id   text,
+  request_endpoint text,
   image_key    text,
   video_key    text,
   duration_sec integer,

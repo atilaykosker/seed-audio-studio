@@ -17,6 +17,12 @@ export async function getSession(db: SupabaseClient, id: string, clips: Clip[]):
   return rowToSession(data as SessionRow, clips)
 }
 
+export async function getSessionRow(db: SupabaseClient, id: string): Promise<SessionRow | null> {
+  const { data, error } = await db.from('sessions').select('*').eq('id', id).single()
+  if (error && (error as { code?: string }).code !== 'PGRST116') throw error
+  return (data as SessionRow) ?? null
+}
+
 export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updatedAt' | 'category' | 'videoModel'>
 
 export async function listSessions(db: SupabaseClient): Promise<SessionSummary[]> {

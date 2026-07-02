@@ -1,5 +1,5 @@
 // src/server/pipeline/inputs.ts
-import type { Character, Scene, BioStage } from '../../lib/types'
+import type { Character, Scene, BioStage, BiographyPlan, BioShot, BioPage } from '../../lib/types'
 import { ENDPOINTS, buildVideoInput, getVideoModel, type VideoModelId } from '../../services/fal/client'
 import { buildCharacterImagePrompt, buildKeyframePrompt, buildStageImagePrompt, buildBioKeyframePrompt } from '../../services/studio/image'
 import { buildVideoPrompt, buildBioVideoPrompt } from '../../services/studio/video'
@@ -7,6 +7,15 @@ import { buildVideoPrompt, buildBioVideoPrompt } from '../../services/studio/vid
 export interface FalJob { endpointId: string; input: Record<string, unknown> }
 type Aspect = 'landscape' | 'portrait'
 const ar = (a: Aspect) => (a === 'portrait' ? '9:16' : '16:9')
+
+/** Locate a biography shot (and its page) by shot id across every page. */
+export function findBioShot(bioPlan: BiographyPlan, shotId: string): { shot: BioShot; page: BioPage } | null {
+  for (const page of bioPlan.pages) {
+    const shot = page.shots.find((s) => s.id === shotId)
+    if (shot) return { shot, page }
+  }
+  return null
+}
 
 export function characterMintJob(c: Character): FalJob {
   return { endpointId: ENDPOINTS.nanoBanana, input: { prompt: buildCharacterImagePrompt(c), aspect_ratio: '1:1' } }

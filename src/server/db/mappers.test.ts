@@ -54,7 +54,7 @@ describe('clip mappers', () => {
   it('rowToClip injects presigned media URLs from the API layer', () => {
     const row = {
       id: 'c', session_id: 'sid', scene_id: 'sc', title: 'Scene 1', speakers: [], prompt: 'p',
-      status: 'done' as const, phase: 'done' as const, request_id: null,
+      status: 'done' as const, phase: 'done' as const, request_id: null, request_endpoint: null,
       image_key: 'k1.png', video_key: 'k2.mp4', duration_sec: 8, error: null, created_at: 'x',
     }
     const c = rowToClip(row, { imageUrl: 'https://s3/k1.png?sig', videoUrl: 'https://s3/k2.mp4?sig' })
@@ -67,7 +67,7 @@ describe('clip mappers', () => {
   it('rowToClip maps null phase/error/duration_sec to undefined', () => {
     const row = {
       id: 'c', session_id: 'sid', scene_id: 'sc', title: 'Scene 1', speakers: [], prompt: 'p',
-      status: 'pending' as const, phase: null, request_id: null,
+      status: 'pending' as const, phase: null, request_id: null, request_endpoint: null,
       image_key: null, video_key: null, duration_sec: null, error: null, created_at: 'x',
     }
     const c = rowToClip(row, {})

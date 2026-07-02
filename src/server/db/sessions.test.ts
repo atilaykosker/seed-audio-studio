@@ -1,6 +1,6 @@
 // src/server/db/sessions.test.ts
 import { describe, it, expect } from 'vitest'
-import { createSession, getSession, listSessions } from './sessions'
+import { createSession, getSession, getSessionRow, listSessions } from './sessions'
 import type { Session, Clip } from '../../lib/types'
 
 const brief: Session['brief'] = {
@@ -50,6 +50,23 @@ describe('getSession', () => {
     const { db } = fakeDb({ data: null, error: { code: 'PGRST116' } })
     const s = await getSession(db as never, 'nope', [])
     expect(s).toBeNull()
+  })
+})
+
+describe('getSessionRow', () => {
+  it('returns the raw row (brief/plan/video_model) when found', async () => {
+    const row = { id: 'sid', title: 'T', brief, plan: null, bio_plan: null, category: null, video_model: 'm', created_at: '2026-07-02T00:00:00.000Z', updated_at: '2026-07-02T00:00:00.000Z' }
+    const { db, calls } = fakeDb({ data: row, error: null })
+    const out = await getSessionRow(db as never, 'sid')
+    expect(out).toEqual(row)
+    expect(calls.find((c) => c.m === 'from')?.args[0]).toBe('sessions')
+    expect(calls.find((c) => c.m === 'eq')?.args).toEqual(['id', 'sid'])
+  })
+
+  it('returns null when the row is missing (PGRST116)', async () => {
+    const { db } = fakeDb({ data: null, error: { code: 'PGRST116', message: 'not found' } })
+    const out = await getSessionRow(db as never, 'nope')
+    expect(out).toBeNull()
   })
 })
 

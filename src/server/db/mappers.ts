@@ -38,6 +38,7 @@ export function clipToInsert(sessionId: string, c: Clip): ClipInsert {
     status: c.status,
     phase: c.phase ?? null,
     request_id: null,
+    request_endpoint: null,
     image_key: null,
     video_key: null,
     duration_sec: c.durationSec ?? null,

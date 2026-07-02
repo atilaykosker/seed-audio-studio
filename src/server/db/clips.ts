@@ -20,6 +20,7 @@ export interface ClipPatch {
   status?: ClipRow['status']
   phase?: ClipRow['phase']
   request_id?: string | null
+  request_endpoint?: string | null
   image_key?: string | null
   video_key?: string | null
   duration_sec?: number | null
@@ -29,4 +30,21 @@ export interface ClipPatch {
 export async function updateClipStatus(db: SupabaseClient, id: string, patch: ClipPatch): Promise<void> {
   const { error } = await db.from('clips').update(patch).eq('id', id)
   if (error) throw error
+}
+
+export async function getClip(db: SupabaseClient, id: string): Promise<ClipRow | null> {
+  const { data, error } = await db.from('clips').select('*').eq('id', id).single()
+  if (error && (error as { code?: string }).code !== 'PGRST116') throw error
+  return (data as ClipRow) ?? null
+}
+
+export async function getClipBySceneId(db: SupabaseClient, sessionId: string, sceneId: string): Promise<ClipRow | null> {
+  const { data, error } = await db
+    .from('clips')
+    .select('*')
+    .eq('session_id', sessionId)
+    .eq('scene_id', sceneId)
+    .single()
+  if (error && (error as { code?: string }).code !== 'PGRST116') throw error
+  return (data as ClipRow) ?? null
 }
