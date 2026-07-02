@@ -78,7 +78,6 @@ export async function run<T = unknown>(
 /** Default timeouts (ms) per model — generous backstops above realistic durations. */
 export const TIMEOUTS = {
   llm: 120_000, // plans ~23s observed; catch true stalls
-  seedAudio: 300_000,
   image: 180_000,
   video: 600_000, // kling video legitimately takes minutes
 } as const
@@ -89,20 +88,12 @@ export async function uploadAsset(blob: Blob): Promise<string> {
 }
 
 export const ENDPOINTS = {
-  /** Multi-voice / single-voice TTS with native SFX + ambience. */
-  seedAudio: 'bytedance/seed-audio-1.0',
   /** fal's OpenRouter gateway for LLM planning/categorization. */
   llm: 'openrouter/router',
   /** Text-to-image for character references / scene keyframes. */
   nanoBanana: 'fal-ai/nano-banana',
   /** Image-conditioned edit variant (compose characters into a keyframe). */
   nanoBananaEdit: 'fal-ai/nano-banana/edit',
-  /** Image-to-video with custom elements for cross-clip consistency. */
-  klingVideo: 'fal-ai/kling-video/v3/pro/image-to-video',
-  /** Lip-sync / dubbing: fuse a video + audio into one lip-synced clip. */
-  latentSync: 'fal-ai/latentsync',
-  /** Plain A/V mux (ffmpeg): merge a video + audio into one clip, no face detection. */
-  mergeAudioVideo: 'fal-ai/ffmpeg-api/merge-audio-video',
 } as const
 
 export interface ModelOption {
@@ -154,54 +145,6 @@ export async function llmText(
   return data.output
 }
 
-export interface SeedAudioOutput {
-  audio: { url: string; duration?: number; content_type?: string }
-}
-
-/** seed-audio rejects a `prompt` longer than this many characters (HTTP 422). */
-export const SEED_AUDIO_MAX_PROMPT = 2048
-
-/**
- * Trim a prompt to at most `max` chars, cutting at the last sentence end (or space)
- * so an over-long LLM scene still renders instead of failing the 2048-char limit.
- */
-export function clampPrompt(prompt: string, max = SEED_AUDIO_MAX_PROMPT): string {
-  if (prompt.length <= max) return prompt
-  const slice = prompt.slice(0, max)
-  const sentence = Math.max(
-    slice.lastIndexOf('." '),
-    slice.lastIndexOf('. '),
-    slice.lastIndexOf('! '),
-    slice.lastIndexOf('? '),
-  )
-  const boundary = sentence > max * 0.5 ? sentence + 1 : slice.lastIndexOf(' ')
-  return (boundary > 0 ? slice.slice(0, boundary) : slice).trim()
-}
-
-/** Generate one seed-audio clip. T2A (no refs) or TA2A (audio_urls ≤3, referenced @Audio1..3). */
-export async function seedAudio(
-  args: {
-    prompt: string
-    audioUrls?: string[]
-    sampleRate?: number
-    outputFormat?: 'wav' | 'mp3'
-  },
-  opts: RunOptions = {},
-): Promise<{ url: string; duration: number }> {
-  const prompt = clampPrompt(args.prompt)
-  if (prompt.length < args.prompt.length) {
-    console.warn(`seed-audio prompt trimmed from ${args.prompt.length} to ${prompt.length} chars (2048 limit).`)
-  }
-  const input: Record<string, unknown> = {
-    prompt,
-    sample_rate: args.sampleRate ?? 44100,
-    output_format: args.outputFormat ?? 'wav',
-  }
-  if (args.audioUrls && args.audioUrls.length) input.audio_urls = args.audioUrls
-  const { data } = await run<SeedAudioOutput>(ENDPOINTS.seedAudio, input, { timeoutMs: TIMEOUTS.seedAudio, ...opts })
-  return { url: data.audio.url, duration: data.audio.duration ?? 0 }
-}
-
 interface NanoBananaOutput {
   images: { url: string; content_type?: string }[]
   description?: string
@@ -226,83 +169,153 @@ export async function nanoBanana(
   return { url }
 }
 
-export interface KlingElement {
-  frontal_image_url: string
-  reference_image_urls?: string[]
+export type VideoModelId =
+  | 'fal-ai/veo3.1/image-to-video'
+  | 'fal-ai/veo3.1/fast/image-to-video'
+  | 'bytedance/seedance-2.0/image-to-video'
+  | 'bytedance/seedance-2.0/fast/image-to-video'
+  | 'fal-ai/kling-video/v3/pro/image-to-video'
+
+export interface VideoModel {
+  id: VideoModelId
+  label: string
+  /** One-line tradeoff shown in the picker. */
+  description: string
+  /** USD per second of generated video (720p). */
+  pricePerSec: number
+  maxDurationSec: number
+  /** Whether the model generates native audio (dialogue/SFX). */
+  audio: boolean
+  /** Model-specific aspect_ratio values. */
+  aspectRatios: { landscape: string; portrait: string }
 }
 
-interface KlingVideoOutput {
-  video: { url: string; content_type?: string; file_name?: string; file_size?: number }
+const LANDSCAPE = '16:9'
+const PORTRAIT = '9:16'
+
+export const VIDEO_MODELS: VideoModel[] = [
+  {
+    id: 'fal-ai/veo3.1/image-to-video',
+    label: 'Veo 3.1',
+    description: 'Highest quality dialogue + lip-sync. Priciest.',
+    pricePerSec: 0.4,
+    maxDurationSec: 8,
+    audio: true,
+    aspectRatios: { landscape: LANDSCAPE, portrait: PORTRAIT },
+  },
+  {
+    id: 'fal-ai/veo3.1/fast/image-to-video',
+    label: 'Veo 3.1 Fast',
+    description: 'Veo audio quality, faster and cheaper.',
+    pricePerSec: 0.25,
+    maxDurationSec: 8,
+    audio: true,
+    aspectRatios: { landscape: LANDSCAPE, portrait: PORTRAIT },
+  },
+  {
+    id: 'bytedance/seedance-2.0/image-to-video',
+    label: 'Seedance 2.0',
+    description: 'Balanced quality + native audio, keeps the input image.',
+    pricePerSec: 0.3,
+    maxDurationSec: 8,
+    audio: true,
+    aspectRatios: { landscape: LANDSCAPE, portrait: PORTRAIT },
+  },
+  {
+    id: 'bytedance/seedance-2.0/fast/image-to-video',
+    label: 'Seedance 2.0 Fast',
+    description: 'Cheapest with audio. Fast turnaround.',
+    pricePerSec: 0.24,
+    maxDurationSec: 8,
+    audio: true,
+    aspectRatios: { landscape: LANDSCAPE, portrait: PORTRAIT },
+  },
+  {
+    id: 'fal-ai/kling-video/v3/pro/image-to-video',
+    label: 'Kling v3 Pro (silent)',
+    description: 'Longer clips (≤15s), strong motion — no audio.',
+    pricePerSec: 0.1,
+    maxDurationSec: 15,
+    audio: false,
+    aspectRatios: { landscape: LANDSCAPE, portrait: PORTRAIT },
+  },
+]
+
+export const DEFAULT_VIDEO_MODEL: VideoModelId = 'bytedance/seedance-2.0/image-to-video'
+
+export function getVideoModel(id: string): VideoModel {
+  return VIDEO_MODELS.find((m) => m.id === id) ?? VIDEO_MODELS.find((m) => m.id === DEFAULT_VIDEO_MODEL)!
 }
+
+export interface NativeVideoArgs {
+  model: VideoModelId
+  prompt: string
+  startImageUrl: string
+  durationSec?: number
+  aspect?: 'landscape' | 'portrait'
+}
+
+/** veo3.1's `duration` field is a string enum of exactly these second counts. */
+const VEO_DURATION_STEPS = [4, 6, 8] as const
 
 /**
- * Drop `@ElementN` references that exceed the number of elements actually sent —
- * kling rejects a prompt that references an element index it wasn't given (HTTP 422).
+ * Build the fal input for one video model. Field names/formats confirmed against each
+ * model's fal API docs (see task-1-report.md):
+ * - veo3.1 (both tiers): `image_url` + `duration` as `"4s"|"6s"|"8s"` + `resolution` + `aspect_ratio` + `generate_audio`.
+ * - seedance-2.0 (both tiers): `image_url` + `duration` as a plain numeric string (e.g. `"8"`) + `resolution` + `aspect_ratio` + `generate_audio`.
+ * - kling v3 pro: `start_image_url` + `duration` as a plain numeric string; no `resolution` field
+ *   (aspect_ratio is accepted but the model infers it from the input image); audio forced off.
  */
-export function stripInvalidElementRefs(prompt: string, elementCount: number): string {
-  return prompt
-    .replace(/@Element\s*(\d+)/gi, (m, n) => (Number(n) >= 1 && Number(n) <= elementCount ? m : ''))
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\s+([,.;:!?])/g, '$1')
-    .trim()
-}
+export function buildVideoInput(model: VideoModel, args: Omit<NativeVideoArgs, 'model'>): Record<string, unknown> {
+  const aspect = model.aspectRatios[args.aspect ?? 'landscape']
+  const requested = args.durationSec ?? 8
 
-/** Generate one kling v3 image-to-video clip. Audio disabled; duration clamped to [3,15]. */
-export async function klingVideo(
-  args: { prompt: string; startImageUrl: string; durationSec?: number; elements?: KlingElement[] },
-  opts: RunOptions = {},
-): Promise<{ url: string }> {
-  const duration = String(Math.min(15, Math.max(3, Math.round(args.durationSec ?? 5))))
-  // kling requires each element to carry BOTH frontal_image_url AND reference_image_urls
-  // (or a video_url). We only mint one image per character, so reuse it as the reference.
-  const elements: KlingElement[] = (args.elements && args.elements.length ? args.elements.slice(0, 3) : []).map(
-    (el) => ({
-      frontal_image_url: el.frontal_image_url,
-      reference_image_urls:
-        el.reference_image_urls && el.reference_image_urls.length ? el.reference_image_urls : [el.frontal_image_url],
-    }),
-  )
-  const input: Record<string, unknown> = {
-    prompt: stripInvalidElementRefs(args.prompt, elements.length),
-    start_image_url: args.startImageUrl,
-    duration,
-    generate_audio: false,
+  if (model.id === 'fal-ai/kling-video/v3/pro/image-to-video') {
+    const seconds = Math.min(model.maxDurationSec, Math.max(3, Math.round(requested)))
+    return {
+      prompt: args.prompt,
+      start_image_url: args.startImageUrl,
+      duration: String(seconds),
+      aspect_ratio: aspect,
+      generate_audio: false,
+    }
   }
-  if (elements.length) input.elements = elements
-  const { data } = await run<KlingVideoOutput>(ENDPOINTS.klingVideo, input, { timeoutMs: TIMEOUTS.video, ...opts })
-  return { url: data.video.url }
+
+  if (model.id.startsWith('fal-ai/veo3.1')) {
+    const clamped = Math.min(model.maxDurationSec, Math.max(3, Math.round(requested)))
+    const seconds = VEO_DURATION_STEPS.reduce((best, v) =>
+      Math.abs(v - clamped) < Math.abs(best - clamped) ? v : best,
+    )
+    return {
+      prompt: args.prompt,
+      image_url: args.startImageUrl,
+      duration: `${seconds}s`,
+      aspect_ratio: aspect,
+      resolution: '720p',
+      generate_audio: model.audio,
+    }
+  }
+
+  // bytedance/seedance-2.0 (base + fast)
+  const seconds = Math.min(model.maxDurationSec, Math.max(4, Math.round(requested)))
+  return {
+    prompt: args.prompt,
+    image_url: args.startImageUrl,
+    duration: String(seconds),
+    aspect_ratio: aspect,
+    resolution: '720p',
+    generate_audio: model.audio,
+  }
 }
 
-interface LatentSyncOutput {
+interface VideoOutput {
   video: { url: string; content_type?: string; file_name?: string; file_size?: number }
 }
 
-/** Lip-sync a video to an audio track, returning a single combined clip (audio embedded). */
-export async function latentSync(
-  args: { videoUrl: string; audioUrl: string },
-  opts: RunOptions = {},
-): Promise<{ url: string }> {
-  const { data } = await run<LatentSyncOutput>(
-    ENDPOINTS.latentSync,
-    { video_url: args.videoUrl, audio_url: args.audioUrl },
-    { timeoutMs: TIMEOUTS.video, ...opts },
-  )
-  return { url: data.video.url }
-}
-
-interface MergeAudioVideoOutput {
-  video: { url: string; content_type?: string; file_name?: string; file_size?: number }
-}
-
-/** Merge a video + audio into one clip via ffmpeg — no face detection, always succeeds. */
-export async function mergeAudioVideo(
-  args: { videoUrl: string; audioUrl: string },
-  opts: RunOptions = {},
-): Promise<{ url: string }> {
-  const { data } = await run<MergeAudioVideoOutput>(
-    ENDPOINTS.mergeAudioVideo,
-    { video_url: args.videoUrl, audio_url: args.audioUrl },
-    { timeoutMs: TIMEOUTS.video, ...opts },
-  )
+/** Generate one image-to-video clip on the selected model. Audio embedded when the model supports it. */
+export async function nativeVideo(args: NativeVideoArgs, opts: RunOptions = {}): Promise<{ url: string }> {
+  const model = getVideoModel(args.model)
+  const input = buildVideoInput(model, args)
+  const { data } = await run<VideoOutput>(model.id, input, { timeoutMs: TIMEOUTS.video, ...opts })
   return { url: data.video.url }
 }

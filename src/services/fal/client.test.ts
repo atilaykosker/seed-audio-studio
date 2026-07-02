@@ -11,16 +11,13 @@ vi.mock('@fal-ai/client', () => ({
 import { fal } from '@fal-ai/client'
 import {
   nanoBanana,
-  klingVideo,
-  seedAudio,
-  latentSync,
-  mergeAudioVideo,
-  clampPrompt,
-  stripInvalidElementRefs,
   run,
   TimeoutError,
   ENDPOINTS,
-  SEED_AUDIO_MAX_PROMPT,
+  VIDEO_MODELS,
+  DEFAULT_VIDEO_MODEL,
+  getVideoModel,
+  buildVideoInput,
 } from './client'
 
 const subscribe = fal.subscribe as ReturnType<typeof vi.fn>
@@ -49,90 +46,6 @@ describe('nanoBanana', () => {
   it('throws when no image is returned', async () => {
     subscribe.mockResolvedValue({ data: { images: [] }, requestId: 'r' })
     await expect(nanoBanana({ prompt: 'x' })).rejects.toThrow(/no image/i)
-  })
-})
-
-describe('klingVideo', () => {
-  it('clamps duration to [3,15], disables audio, maps elements (max 3)', async () => {
-    subscribe.mockResolvedValue({ data: { video: { url: 'https://v/1' } }, requestId: 'r' })
-    const r = await klingVideo({
-      prompt: '@Element1 waves',
-      startImageUrl: 'https://key',
-      durationSec: 99,
-      elements: [
-        { frontal_image_url: 'https://a' },
-        { frontal_image_url: 'https://b' },
-        { frontal_image_url: 'https://c' },
-        { frontal_image_url: 'https://d' },
-      ],
-    })
-    expect(r.url).toBe('https://v/1')
-    const [endpoint, cfg] = subscribe.mock.calls[0]
-    expect(endpoint).toBe(ENDPOINTS.klingVideo)
-    expect(cfg.input).toMatchObject({
-      prompt: '@Element1 waves',
-      start_image_url: 'https://key',
-      duration: '15',
-      generate_audio: false,
-    })
-    expect(cfg.input.elements).toHaveLength(3)
-    // kling requires reference_image_urls alongside frontal_image_url — default to the frontal.
-    expect(cfg.input.elements[0]).toEqual({ frontal_image_url: 'https://a', reference_image_urls: ['https://a'] })
-  })
-
-  it('omits elements when none are given', async () => {
-    subscribe.mockResolvedValue({ data: { video: { url: 'https://v/2' } }, requestId: 'r' })
-    await klingVideo({ prompt: 'empty room', startImageUrl: 'https://key', durationSec: 2 })
-    const cfg = subscribe.mock.calls[0][1]
-    expect(cfg.input.elements).toBeUndefined()
-    expect(cfg.input.duration).toBe('3') // clamped up to min 3
-  })
-
-  it('strips @ElementN from the prompt when no elements are provided', async () => {
-    subscribe.mockResolvedValue({ data: { video: { url: 'https://v/3' } }, requestId: 'r' })
-    await klingVideo({ prompt: '@Element1 and @Element2 chat in the rain', startImageUrl: 'https://key' })
-    const cfg = subscribe.mock.calls[0][1]
-    expect(cfg.input.prompt).not.toMatch(/@Element/)
-    expect(cfg.input.elements).toBeUndefined()
-  })
-})
-
-describe('stripInvalidElementRefs', () => {
-  it('removes refs beyond the element count', () => {
-    expect(stripInvalidElementRefs('@Element1 and @Element2 talk', 1)).toBe('@Element1 and talk')
-  })
-  it('strips every ref when zero elements', () => {
-    expect(stripInvalidElementRefs('@Element1 waves at @Element2', 0)).toBe('waves at')
-  })
-  it('keeps refs within range', () => {
-    expect(stripInvalidElementRefs('@Element1 and @Element2', 2)).toBe('@Element1 and @Element2')
-  })
-})
-
-describe('clampPrompt', () => {
-  it('leaves a short prompt untouched', () => {
-    expect(clampPrompt('hello', 2048)).toBe('hello')
-  })
-
-  it('never exceeds the max length', () => {
-    const long = 'word '.repeat(1000) // 5000 chars
-    expect(clampPrompt(long, SEED_AUDIO_MAX_PROMPT).length).toBeLessThanOrEqual(SEED_AUDIO_MAX_PROMPT)
-  })
-
-  it('prefers a sentence boundary when one is available', () => {
-    const p = 'A'.repeat(1990) + '. ' + 'B'.repeat(200) // sentence end near 1992
-    const out = clampPrompt(p, 2048)
-    expect(out.endsWith('.')).toBe(true)
-    expect(out).not.toContain('B')
-  })
-})
-
-describe('seedAudio prompt clamping', () => {
-  it('sends a prompt no longer than the 2048-char limit', async () => {
-    subscribe.mockResolvedValue({ data: { audio: { url: 'https://a', duration: 5 } }, requestId: 'r' })
-    await seedAudio({ prompt: 'x '.repeat(2000) }) // 4000 chars
-    const cfg = subscribe.mock.calls[0][1]
-    expect(cfg.input.prompt.length).toBeLessThanOrEqual(SEED_AUDIO_MAX_PROMPT)
   })
 })
 
@@ -175,24 +88,54 @@ describe('run timeout/abort', () => {
   })
 })
 
-describe('latentSync', () => {
-  it('sends video_url + audio_url and returns the combined video url', async () => {
-    subscribe.mockResolvedValue({ data: { video: { url: 'https://combined/1' } }, requestId: 'r' })
-    const r = await latentSync({ videoUrl: 'https://vid', audioUrl: 'https://aud' })
-    expect(r.url).toBe('https://combined/1')
-    const [endpoint, cfg] = subscribe.mock.calls[0]
-    expect(endpoint).toBe(ENDPOINTS.latentSync)
-    expect(cfg.input).toEqual({ video_url: 'https://vid', audio_url: 'https://aud' })
+describe('VIDEO_MODELS', () => {
+  it('has the five expected tiers with positive prices and durations', () => {
+    const ids = VIDEO_MODELS.map((m) => m.id)
+    expect(ids).toEqual([
+      'fal-ai/veo3.1/image-to-video',
+      'fal-ai/veo3.1/fast/image-to-video',
+      'bytedance/seedance-2.0/image-to-video',
+      'bytedance/seedance-2.0/fast/image-to-video',
+      'fal-ai/kling-video/v3/pro/image-to-video',
+    ])
+    for (const m of VIDEO_MODELS) {
+      expect(m.pricePerSec).toBeGreaterThan(0)
+      expect(m.maxDurationSec).toBeGreaterThan(0)
+      expect(m.description.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('marks veo + seedance as audio and kling as silent', () => {
+    expect(getVideoModel('fal-ai/veo3.1/image-to-video').audio).toBe(true)
+    expect(getVideoModel('bytedance/seedance-2.0/fast/image-to-video').audio).toBe(true)
+    expect(getVideoModel('fal-ai/kling-video/v3/pro/image-to-video').audio).toBe(false)
+  })
+
+  it('DEFAULT_VIDEO_MODEL is a known id', () => {
+    expect(VIDEO_MODELS.some((m) => m.id === DEFAULT_VIDEO_MODEL)).toBe(true)
   })
 })
 
-describe('mergeAudioVideo', () => {
-  it('sends video_url + audio_url to the ffmpeg mux endpoint and returns the merged url', async () => {
-    subscribe.mockResolvedValue({ data: { video: { url: 'https://muxed/1' } }, requestId: 'r' })
-    const r = await mergeAudioVideo({ videoUrl: 'https://vid', audioUrl: 'https://aud' })
-    expect(r.url).toBe('https://muxed/1')
-    const [endpoint, cfg] = subscribe.mock.calls[0]
-    expect(endpoint).toBe(ENDPOINTS.mergeAudioVideo)
-    expect(cfg.input).toEqual({ video_url: 'https://vid', audio_url: 'https://aud' })
+describe('buildVideoInput', () => {
+  const seedance = getVideoModel('bytedance/seedance-2.0/image-to-video')
+  const kling = getVideoModel('fal-ai/kling-video/v3/pro/image-to-video')
+
+  it('clamps duration to the model max and passes the start image + prompt', () => {
+    const input = buildVideoInput(seedance, { prompt: 'hi', startImageUrl: 'u', durationSec: 999, aspect: 'landscape' })
+    expect(input.prompt).toBe('hi')
+    expect(input.image_url).toBe('u')
+    expect(Number(input.duration)).toBeLessThanOrEqual(seedance.maxDurationSec)
+  })
+
+  it('requests audio only for audio-capable models', () => {
+    expect(buildVideoInput(seedance, { prompt: 'p', startImageUrl: 'u' }).generate_audio).toBe(true)
+    expect(buildVideoInput(kling, { prompt: 'p', startImageUrl: 'u' }).generate_audio).toBe(false)
+  })
+
+  it('maps portrait/landscape to the model aspect value', () => {
+    const l = buildVideoInput(seedance, { prompt: 'p', startImageUrl: 'u', aspect: 'landscape' })
+    const p = buildVideoInput(seedance, { prompt: 'p', startImageUrl: 'u', aspect: 'portrait' })
+    expect(l.aspect_ratio).toBe(seedance.aspectRatios.landscape)
+    expect(p.aspect_ratio).toBe(seedance.aspectRatios.portrait)
   })
 })
