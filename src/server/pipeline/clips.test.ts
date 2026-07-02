@@ -12,6 +12,16 @@ describe('planToClips', () => {
     expect(clips[0]).toMatchObject({ sceneId: 's1', title: 'Open', speakers: ['A'], prompt: 'a room\nHello', status: 'pending' })
     expect(clips[0].id).toBeTruthy()
   })
+
+  it('joins visual+dialogue with filter(Boolean) parity to the store (no stray newline on empty dialogue)', () => {
+    const plan: Plan = { category: 'Drama', characters: [], scenes: [
+      { id: 's1', title: 'Silent', speakers: ['A'], visual: 'a room', dialogue: '' },
+      { id: 's2', title: 'Talk', speakers: ['A'], visual: 'a room', dialogue: 'Hello' },
+    ] }
+    const clips = planToClips(plan)
+    expect(clips[0].prompt).toBe('a room')
+    expect(clips[1].prompt).toBe('a room\nHello')
+  })
 })
 
 describe('bioPlanToClips', () => {

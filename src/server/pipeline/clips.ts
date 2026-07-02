@@ -12,7 +12,7 @@ export function planToClips(plan: Plan): Clip[] {
     sceneId: scene.id,
     title: scene.title,
     speakers: scene.speakers,
-    prompt: `${scene.visual}\n${scene.dialogue}`,
+    prompt: [scene.visual, scene.dialogue].filter(Boolean).join('\n'),
     status: 'pending' as const,
   }))
 }
