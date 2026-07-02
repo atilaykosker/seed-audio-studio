@@ -24,3 +24,27 @@ export async function deleteCharacter(db: SupabaseClient, id: string): Promise<v
   const { error } = await db.from('character_library').delete().eq('id', id)
   if (error) throw error
 }
+
+export async function insertPendingCharacter(db: SupabaseClient, c: CharacterImage, requestId: string): Promise<CharacterRow> {
+  const { data, error } = await db
+    .from('character_library')
+    .insert({ ...characterToInsert(c, ''), request_id: requestId, status: 'queued' })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as CharacterRow
+}
+
+export async function finishCharacter(db: SupabaseClient, id: string, imageKey: string): Promise<void> {
+  const { error } = await db
+    .from('character_library')
+    .update({ image_key: imageKey, status: 'done', request_id: null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function getCharacter(db: SupabaseClient, id: string): Promise<CharacterRow | null> {
+  const { data, error } = await db.from('character_library').select('*').eq('id', id).single()
+  if (error && (error as { code?: string }).code !== 'PGRST116') throw error
+  return (data as CharacterRow) ?? null
+}
