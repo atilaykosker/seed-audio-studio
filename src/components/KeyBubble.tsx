@@ -73,7 +73,7 @@ export function KeyBubble() {
         </>
       ) : (
         <>
-          <Button className="rounded-full shadow-lg" onClick={() => setKeyOpen(true)}>
+          <Button variant="gradient" className="rounded-full" onClick={() => setKeyOpen(true)}>
             <KeyRound className="size-4" /> Login with Fal key
           </Button>
           <Dialog open={keyOpen} onOpenChange={setKeyOpen}>

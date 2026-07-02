@@ -1,6 +1,6 @@
 import { configureFal, uploadAsset } from './client'
 
-const STORAGE_KEY = 'seed-audio-studio:key'
+const STORAGE_KEY = 'bookticle-studio:key'
 
 export function getStoredKey(): string | null {
   return localStorage.getItem(STORAGE_KEY)

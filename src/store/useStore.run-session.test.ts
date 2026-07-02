@@ -33,7 +33,7 @@ beforeEach(() => {
 describe('runStudio session persistence', () => {
   it('creates and persists a session titled from the brief with the generated clips', async () => {
     await useStore.getState().runStudio()
-    const sessions = JSON.parse(localStorage.getItem('seed-audio-studio:sessions')!)
+    const sessions = JSON.parse(localStorage.getItem('bookticle-studio:sessions')!)
     expect(sessions).toHaveLength(1)
     expect(sessions[0].title).toBe('a rainy day')
     expect(sessions[0].category).toBe('Podcast')
@@ -43,7 +43,7 @@ describe('runStudio session persistence', () => {
   it('reuses the active session instead of creating a second one on regenerate', async () => {
     await useStore.getState().runStudio()
     await useStore.getState().runStudio() // activeSessionId is now set → update in place
-    const sessions = JSON.parse(localStorage.getItem('seed-audio-studio:sessions')!)
+    const sessions = JSON.parse(localStorage.getItem('bookticle-studio:sessions')!)
     expect(sessions).toHaveLength(1)
   })
 })

@@ -10,11 +10,12 @@ import { cn } from '@/lib/utils'
 
 // --- Button ---
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm',
+        gradient: 'btn-gradient font-semibold',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         outline: 'border bg-background hover:bg-accent hover:text-accent-foreground',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
@@ -45,19 +46,27 @@ Button.displayName = 'Button'
 
 // --- Card ---
 export function Card({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-xl border bg-card text-card-foreground shadow-sm', className)} {...p} />
+  return (
+    <div
+      className={cn(
+        'card-fancy rounded-2xl border bg-card text-card-foreground shadow-sm',
+        className,
+      )}
+      {...p}
+    />
+  )
 }
 export function CardHeader({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('flex flex-col space-y-1 p-5', className)} {...p} />
+  return <div className={cn('flex flex-col space-y-1 p-6', className)} {...p} />
 }
 export function CardTitle({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) {
-  return <h3 className={cn('font-semibold leading-none tracking-tight', className)} {...p} />
+  return <h3 className={cn('font-display text-base font-semibold leading-none tracking-tight', className)} {...p} />
 }
 export function CardDescription({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) {
   return <p className={cn('text-sm text-muted-foreground', className)} {...p} />
 }
 export function CardContent({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('p-5 pt-0', className)} {...p} />
+  return <div className={cn('p-6 pt-0', className)} {...p} />
 }
 
 // --- Input ---
@@ -111,7 +120,7 @@ export function Switch({
       aria-checked={checked}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         checked ? 'bg-primary' : 'bg-input',
         className,
       )}
@@ -211,7 +220,7 @@ export const ToggleGroupItem = React.forwardRef<
   <ToggleGroupPrimitive.Item
     ref={ref}
     className={cn(
-      'inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-sm font-medium transition-colors hover:bg-accent data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground',
+      'inline-flex h-9 cursor-pointer items-center justify-center rounded-md border bg-background px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground',
       className,
     )}
     {...props}
@@ -285,7 +294,7 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-9 w-full items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm transition-colors data-[placeholder]:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [&>span]:line-clamp-1',
+      'flex h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm transition-colors data-[placeholder]:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
       className,
     )}
     {...props}

@@ -16,7 +16,7 @@ export function Toaster() {
       role="region"
       aria-label="Notifications"
       aria-live="polite"
-      className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-80 flex-col gap-2"
+      className="pointer-events-none fixed bottom-20 right-4 z-[100] flex w-[calc(100vw-2rem)] max-w-80 flex-col gap-2"
     >
       {toasts.map((t) => {
         const Icon = ICONS[t.kind]
@@ -45,7 +45,7 @@ export function Toaster() {
               type="button"
               aria-label="Dismiss notification"
               onClick={() => dismiss(t.id)}
-              className="text-muted-foreground hover:text-foreground"
+              className="-m-1 grid size-6 shrink-0 cursor-pointer place-items-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X className="size-3.5" />
             </button>

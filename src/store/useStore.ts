@@ -6,11 +6,11 @@ import { makePlan, makeBioPlan } from '@/services/studio/plan'
 import { generateFromPlan, generateSceneClip, generateBiography, generateBioShot } from '@/services/studio/generate'
 import type { Brief, Clip, CharacterImage, BiographyPlan, Plan, Session, StudioStatus } from '@/lib/types'
 
-const MODEL_KEY = 'seed-audio-studio:model'
-const VIDEO_MODEL_KEY = 'seed-audio-studio:videoModel'
-const CHAR_KEY = 'seed-audio-studio:characters'
-const SESS_KEY = 'seed-audio-studio:sessions'
-const ACTIVE_KEY = 'seed-audio-studio:activeSession'
+const MODEL_KEY = 'bookticle-studio:model'
+const VIDEO_MODEL_KEY = 'bookticle-studio:videoModel'
+const CHAR_KEY = 'bookticle-studio:characters'
+const SESS_KEY = 'bookticle-studio:sessions'
+const ACTIVE_KEY = 'bookticle-studio:activeSession'
 
 export interface Toast {
   id: string

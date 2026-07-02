@@ -65,7 +65,7 @@ export function BriefForm() {
           {examples.map((ex) => (
             <button
               key={ex}
-              className="text-left text-xs rounded-md border border-border/60 px-2 py-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              className="cursor-pointer text-left text-xs rounded-md border border-border/60 px-2 py-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => setBrief({ idea: ex })}
             >
               {ex.length > 46 ? ex.slice(0, 44) + '…' : ex}
@@ -160,7 +160,7 @@ export function BriefForm() {
 
       <VideoModelPicker />
 
-      <Button className="w-full" disabled={busy} onClick={() => run()}>
+      <Button variant="gradient" size="lg" className="w-full" disabled={busy} onClick={() => run()}>
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
         {busy ? 'Generating…' : hasKey ? (isBio ? 'Generate biography' : 'Generate video') : 'Add key & generate'}
       </Button>

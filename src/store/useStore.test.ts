@@ -18,7 +18,7 @@ describe('character library', () => {
     const lib = useStore.getState().characterLibrary
     expect(lib).toHaveLength(1)
     expect(lib[0].url).toBe('https://a2')
-    expect(JSON.parse(localStorage.getItem('seed-audio-studio:characters')!)).toHaveLength(1)
+    expect(JSON.parse(localStorage.getItem('bookticle-studio:characters')!)).toHaveLength(1)
   })
 
   it('removeCharacterImage removes by id', () => {
@@ -39,10 +39,10 @@ describe('sessions', () => {
     useStore.getState().beginSession()
     const id = useStore.getState().activeSessionId
     expect(id).toBeTruthy()
-    const lib = JSON.parse(localStorage.getItem('seed-audio-studio:sessions')!) as Session[]
+    const lib = JSON.parse(localStorage.getItem('bookticle-studio:sessions')!) as Session[]
     expect(lib).toHaveLength(1)
     expect(lib[0].title).toBe('rainy day')
-    expect(localStorage.getItem('seed-audio-studio:activeSession')).toBe(id)
+    expect(localStorage.getItem('bookticle-studio:activeSession')).toBe(id)
     useStore.getState().beginSession() // no-op while active
     expect(useStore.getState().sessions).toHaveLength(1)
   })
@@ -52,7 +52,7 @@ describe('sessions', () => {
     useStore.getState().beginSession()
     useStore.setState({ category: 'Podcast', clips: [clip1] })
     useStore.getState().saveActiveSession()
-    const lib = JSON.parse(localStorage.getItem('seed-audio-studio:sessions')!) as Session[]
+    const lib = JSON.parse(localStorage.getItem('bookticle-studio:sessions')!) as Session[]
     expect(lib[0].category).toBe('Podcast')
     expect(lib[0].clips[0].videoUrl).toBe('https://a')
   })
@@ -89,6 +89,6 @@ describe('sessions', () => {
     expect(useStore.getState().sessions).toHaveLength(0)
     expect(useStore.getState().activeSessionId).toBeNull()
     expect(useStore.getState().clips).toHaveLength(0)
-    expect(localStorage.getItem('seed-audio-studio:activeSession')).toBeNull()
+    expect(localStorage.getItem('bookticle-studio:activeSession')).toBeNull()
   })
 })

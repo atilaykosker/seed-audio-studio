@@ -1,4 +1,4 @@
-# Seed Audio Studio
+# Bookticle Studio
 
 [![Live demo](https://img.shields.io/badge/demo-seed--audio--studio.vercel.app-000?logo=vercel)](https://seed-audio-studio.vercel.app)
 [![CI](https://github.com/egebese/seed-audio-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/egebese/seed-audio-studio/actions/workflows/ci.yml)
