@@ -26,9 +26,11 @@ export async function deleteCharacter(db: SupabaseClient, id: string): Promise<v
 }
 
 export async function insertPendingCharacter(db: SupabaseClient, c: CharacterImage, requestId: string): Promise<CharacterRow> {
+  // Upsert on name_normalized: character_library has a unique index on lower(name), so a
+  // repeated/retried/reused character name must reset the existing row rather than collide.
   const { data, error } = await db
     .from('character_library')
-    .insert({ ...characterToInsert(c, ''), request_id: requestId, status: 'queued' })
+    .upsert({ ...characterToInsert(c, ''), request_id: requestId, status: 'queued' }, { onConflict: 'name_normalized' })
     .select('*')
     .single()
   if (error) throw error

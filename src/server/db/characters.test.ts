@@ -34,15 +34,16 @@ describe('listCharacters', () => {
 })
 
 describe('insertPendingCharacter', () => {
-  it('inserts a queued row with the request_id into character_library and returns it', async () => {
+  it('upserts a queued row on the name conflict target and returns it', async () => {
     const row = { id: 'i', name: 'Robot', image_key: '', source: 'minted', request_id: 'req-1', status: 'queued', created_at: 'x' }
     const { db, calls } = fakeDb({ data: row, error: null })
     const ch: CharacterImage = { id: '', name: 'Robot', url: '', source: 'minted', createdAt: 0 }
     const out = await insertPendingCharacter(db as never, ch, 'req-1')
     expect(out).toEqual(row)
     expect(calls.find((c) => c.m === 'from')?.args[0]).toBe('character_library')
-    const insertCall = calls.find((c) => c.m === 'insert')
-    expect(insertCall?.args[0]).toMatchObject({ status: 'queued', request_id: 'req-1' })
+    const upsertCall = calls.find((c) => c.m === 'upsert')
+    expect(upsertCall?.args[0]).toMatchObject({ status: 'queued', request_id: 'req-1' })
+    expect(upsertCall?.args[1]).toEqual({ onConflict: 'name_normalized' })
   })
 })
 

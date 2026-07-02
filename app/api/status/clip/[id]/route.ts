@@ -26,6 +26,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!clip.request_id) {
     return NextResponse.json({ status: clip.status })
   }
+  if (!clip.request_endpoint) {
+    return NextResponse.json({ status: clip.status })
+  }
 
   try {
     const st = await jobStatus(clip.request_endpoint!, clip.request_id)
@@ -93,7 +96,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   } catch (e) {
     const friendly = mapFalError(e)
     try {
-      await updateClipStatus(db, id, { status: 'error', error: friendly.message, request_id: null })
+      await updateClipStatus(db, id, { status: 'error', error: friendly.message, request_id: null, phase: null })
     } catch {
       // best-effort; don't mask the original error
     }

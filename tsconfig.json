@@ -9,6 +9,8 @@
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    // The "./src/*" fallback lets src/server/** (compiled under this root Next program) import
+    // Vite-side src/services/** files that use "@/"=src, alongside the root-relative "@/app/..." usage.
     "paths": { "@/*": ["./*", "./src/*"] },
     "plugins": [{ "name": "next" }],
     "allowJs": true,
