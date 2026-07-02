@@ -46,7 +46,7 @@ describe('parsePlan', () => {
 
 describe('buildPlanPrompt', () => {
   it('includes the idea, target length and aspect', () => {
-    const b: Brief = { idea: 'a fox finds a lamp', durationSec: 24, language: 'EN', speakers: 'auto', genre: '', aspect: 'portrait' }
+    const b: Brief = { idea: 'a fox finds a lamp', durationSec: 24, language: 'EN', speakers: 'auto', genre: '', aspect: 'portrait', type: 'story', shotSec: 8 }
     const out = buildPlanPrompt(b)
     expect(out).toContain('a fox finds a lamp')
     expect(out).toContain('24')
