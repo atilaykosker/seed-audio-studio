@@ -38,3 +38,9 @@ lora-lab
 
 # Local test/generation artifacts
 test-output
+
+# Next.js / Cloudflare Workers (OpenNext)
+.next/
+.open-next/
+.dev.vars
+.wrangler/
