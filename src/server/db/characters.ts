@@ -7,7 +7,7 @@ import { characterToInsert } from './mappers'
 export async function upsertCharacter(db: SupabaseClient, c: CharacterImage, imageKey: string): Promise<CharacterRow> {
   const { data, error } = await db
     .from('character_library')
-    .upsert(characterToInsert(c, imageKey), { onConflict: 'name' })
+    .upsert(characterToInsert(c, imageKey), { onConflict: 'name_normalized' })
     .select('*')
     .single()
   if (error) throw error

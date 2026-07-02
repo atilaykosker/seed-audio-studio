@@ -56,7 +56,7 @@ export function rowToClip(row: ClipRow, media: { imageUrl?: string; videoUrl?: s
     phase: row.phase ?? undefined,
     imageUrl: media.imageUrl,
     videoUrl: media.videoUrl,
-    durationSec: row.duration_sec ?? undefined,
+    durationSec: row.duration_sec == null ? undefined : Number(row.duration_sec),
     error: row.error ?? undefined,
   }
 }

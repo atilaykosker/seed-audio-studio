@@ -25,7 +25,7 @@ create table if not exists clips (
   request_id   text,
   image_key    text,
   video_key    text,
-  duration_sec numeric,
+  duration_sec integer,
   error        text,
   created_at   timestamptz not null default now()
 );
@@ -34,6 +34,7 @@ create index if not exists clips_session_id_idx on clips(session_id);
 create table if not exists character_library (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
+  name_normalized text generated always as (lower(name)) stored,
   image_key    text not null,
   source       text not null default 'minted',
   request_id   text,
@@ -41,4 +42,6 @@ create table if not exists character_library (
   created_at   timestamptz not null default now()
 );
 -- Case-insensitive reuse key (matches the store's lowercased name lookup).
-create unique index if not exists character_library_name_key on character_library(lower(name));
+-- A generated column (rather than an expression index) so PostgREST's
+-- on_conflict= can infer the unique constraint by column name.
+create unique index if not exists character_library_name_normalized_key on character_library(name_normalized);

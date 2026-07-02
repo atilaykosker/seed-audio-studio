@@ -47,7 +47,7 @@ describe('getSession', () => {
   })
 
   it('returns null when the row is missing', async () => {
-    const { db } = fakeDb({ data: null, error: null })
+    const { db } = fakeDb({ data: null, error: { code: 'PGRST116' } })
     const s = await getSession(db as never, 'nope', [])
     expect(s).toBeNull()
   })
@@ -60,5 +60,6 @@ describe('listSessions', () => {
     const list = await listSessions(db as never)
     expect(list[0]).toMatchObject({ id: 's1', title: 'A', category: 'C', videoModel: 'm' })
     expect(calls.find((c) => c.m === 'order')?.args[0]).toBe('updated_at')
+    expect(calls.find((c) => c.m === 'order')?.args[1]).toEqual({ ascending: false })
   })
 })

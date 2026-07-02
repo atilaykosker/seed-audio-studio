@@ -63,6 +63,18 @@ describe('clip mappers', () => {
     expect(c.durationSec).toBe(8)
     expect(c.status).toBe('done')
   })
+
+  it('rowToClip maps null phase/error/duration_sec to undefined', () => {
+    const row = {
+      id: 'c', session_id: 'sid', scene_id: 'sc', title: 'Scene 1', speakers: [], prompt: 'p',
+      status: 'pending' as const, phase: null, request_id: null,
+      image_key: null, video_key: null, duration_sec: null, error: null, created_at: 'x',
+    }
+    const c = rowToClip(row, {})
+    expect(c.phase).toBeUndefined()
+    expect(c.error).toBeUndefined()
+    expect(c.durationSec).toBeUndefined()
+  })
 })
 
 describe('character mappers', () => {
