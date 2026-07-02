@@ -1,14 +1,3 @@
-/** A reusable character voice: minted via T2A or uploaded, hosted on fal CDN. */
-export interface Voice {
-  id: string
-  name: string
-  voiceSpec: string
-  url: string
-  durationSec: number
-  source: 'minted' | 'uploaded'
-  createdAt: number
-}
-
 /** A reusable character reference image, hosted on the fal CDN. */
 export interface CharacterImage {
   id: string
@@ -18,28 +7,25 @@ export interface CharacterImage {
   createdAt: number
 }
 
-/** A character the LLM plans for the scene (before its voice is minted). */
+/** A character the LLM plans for the story. */
 export interface Character {
   name: string
-  /** Short attribute spec, e.g. "male, 30s, British, warm baritone, dry wit". */
-  voiceSpec: string
-  /** ~55-70 word one-mood T2A monologue used to mint the reference clip. */
-  refPrompt: string
-  /** Optional visual description used to mint the character reference image. */
-  appearance?: string
+  /** Visual description for the character reference image (age, build, hair, clothing, art style). */
+  appearance: string
+  /** Short voice description embedded in each shot prompt for audio-capable models (best-effort consistency). */
+  voice: string
 }
 
-/** One generatable unit: a single seed-audio call. */
+/** One generatable unit: a single ≤8s video shot. */
 export interface Scene {
   id: string
-  kind: 'T2A' | 'TA2A'
   title: string
-  /** Character names that speak in this scene (TA2A: order maps to @Audio1..3, ≤3). */
+  /** Character names on screen / speaking in this shot (≤3), in @Element / dialogue order. */
   speakers: string[]
-  /** Full seed-audio prompt (already tagged + SFX/atmosphere baked in). */
-  prompt: string
-  /** Optional shot/camera description for the scene keyframe + video. */
-  visual?: string
+  /** Shot description: setting, framing, camera move, lighting, action. */
+  visual: string
+  /** Spoken lines for this shot; empty for a silent/atmospheric shot. */
+  dialogue: string
 }
 
 export interface Plan {
@@ -48,28 +34,24 @@ export interface Plan {
   scenes: Scene[]
 }
 
-export type ClipStatus = 'pending' | 'minting' | 'running' | 'done' | 'error'
+export type ClipStatus = 'pending' | 'running' | 'done' | 'error'
 
-/** A generated audio result, one per scene. */
+/** A generated shot, one per scene: a video clip (with embedded audio when the model supports it). */
 export interface Clip {
   id: string
   sceneId: string
   title: string
-  kind: 'T2A' | 'TA2A'
   speakers: string[]
+  /** Composed prompt sent to the video model (for display). */
   prompt: string
-  url?: string
+  /** Scene keyframe used as the i2v start frame. */
+  imageUrl?: string
+  /** Final video clip URL. */
+  videoUrl?: string
   durationSec?: number
   status: ClipStatus
   phase?: 'queued' | 'running' | 'done'
   error?: string
-  imageUrl?: string
-  videoUrl?: string
-  videoStatus?: ClipStatus
-  videoPhase?: 'queued' | 'running' | 'done'
-  lipsyncUrl?: string
-  lipsyncStatus?: ClipStatus
-  lipsyncPhase?: 'queued' | 'running' | 'done'
 }
 
 export type StudioStatus = 'idle' | 'planning' | 'generating' | 'done' | 'error'
@@ -80,10 +62,8 @@ export interface Brief {
   language: 'EN' | 'ZH'
   speakers: 'auto' | 1 | 2 | 3
   genre: string
-  /** Library voice ids the user pinned as reference samples for this generation. */
-  voiceIds: string[]
-  /** When true, also generate a keyframe image + kling video per scene. */
-  withVideo: boolean
+  /** Video output orientation. */
+  aspect: 'landscape' | 'portrait'
 }
 
 /** A saved run: brief + plan + results, persisted in localStorage and listed in the sidebar. */
@@ -96,4 +76,6 @@ export interface Session {
   plan: Plan | null
   category: string | null
   clips: Clip[]
+  /** Video model id used for this run. */
+  videoModel: string
 }
