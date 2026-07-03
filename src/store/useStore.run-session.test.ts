@@ -47,7 +47,7 @@ describe('runStudio (story, happy path — statuses resolve done on first poll)'
 
     expect(api.createPlan).toHaveBeenCalledWith(
       expect.objectContaining({ idea: 'a rainy day' }),
-      expect.objectContaining({}),
+      expect.objectContaining({ model: expect.any(String), videoModel: expect.any(String) }),
     )
     expect(api.generateCharacter).toHaveBeenCalledWith(plan.characters[0])
     expect(api.generateScene).toHaveBeenCalledWith('sess1', 's1')

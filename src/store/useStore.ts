@@ -71,6 +71,7 @@ interface Store {
   dismissToast: (id: string) => void
 
   hydrate: () => Promise<void>
+  refreshSessions: () => Promise<void>
 
   setModel: (m: string) => void
   setVideoModel: (m: string) => void
@@ -120,6 +121,14 @@ export const useStore = create<Store>((set, get) => ({
       set({ sessions, characterLibrary, model, videoModel })
     } catch (e) {
       get().toast(errorToast(e))
+    }
+  },
+
+  refreshSessions: async () => {
+    try {
+      set({ sessions: await api.listSessions() })
+    } catch {
+      /* non-fatal: sidebar refresh */
     }
   },
 
@@ -272,7 +281,7 @@ export const useStore = create<Store>((set, get) => ({
       clips: res.clips,
       status: 'generating',
     })
-    void get().hydrate()
+    void get().refreshSessions()
 
     const patchClipByScene = (sceneId: string, patch: Partial<Clip>) =>
       set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...patch } : c)) }))
