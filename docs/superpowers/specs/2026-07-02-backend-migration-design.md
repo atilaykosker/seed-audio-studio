@@ -3,13 +3,30 @@
 **Date:** 2026-07-02
 **Status:** Approved (design), corrected to match the real (video) codebase
 
+> **DB REVISION 2026-07-03 — Supabase → Cloudflare D1.** The database was switched
+> from Supabase Postgres to **Cloudflare D1** (SQLite) — a first-class Workers binding
+> (`env.DB`) rather than an HTTP client, so it's the truly native choice for the
+> all-Cloudflare-Workers target, needs no external service/credentials, and runs
+> locally under `wrangler dev` (removing the "provision a Supabase project" blocker
+> before the live smoke). D1 is durable (production D1 has 30-day Time Travel + backups;
+> local D1 is a persistent SQLite file under `.wrangler/`). **Storage stays AWS S3**
+> (`aws4fetch`). This reworks the DB access layer only — the pure domain↔row mappers,
+> the whole pipeline/state-machine, auth, and the S3 wrapper are unchanged. The
+> authoritative D1 schema + repo rewrite lives in
+> `docs/superpowers/plans/2026-07-03-backend-2b-supabase-to-d1.md`. SQLite deltas from
+> the Postgres DDL below: app-generated `crypto.randomUUID()` ids (no `gen_random_uuid()`),
+> JSON stored as `TEXT` (parse/stringify in the repo, not `jsonb`), timestamps as ISO
+> `TEXT`, `duration_sec integer`; the `name_normalized` generated-stored column + unique
+> index + `ON CONFLICT` upsert and `ON DELETE CASCADE` all work in D1/SQLite.
+
 ## Summary
 
 Convert the current browser-only BYOK SPA into a login-gated, server-backed
 application. Instead of each user pasting their own fal.ai key into `localStorage`,
 a single shared password gates access, one org-wide fal.ai key lives server-side,
-and all state (sessions, plans, clips, character library) is persisted in a Supabase
-Postgres database with generated **videos and keyframe images** stored in AWS S3.
+and all state (sessions, plans, clips, character library) is persisted in a
+**Cloudflare D1 (SQLite)** database with generated **videos and keyframe images**
+stored in AWS S3.
 
 The app is rebuilt on **Next.js App Router** and deployed to **Cloudflare Workers**
 via `@opennextjs/cloudflare`.
@@ -44,7 +61,7 @@ via `@opennextjs/cloudflare`.
 |---|---|---|
 | Framework | Next.js App Router | Server route handlers host the pipeline; UI ports cleanly from React 19/Tailwind v4/zustand |
 | Hosting | Cloudflare Workers (`@opennextjs/cloudflare`, `nodejs_compat`) | User requirement |
-| Database | Supabase Postgres via `@supabase/supabase-js` | fetch-based client works reliably on Workers (no TCP driver problems) |
+| Database | Cloudflare D1 (SQLite) via the `env.DB` binding | native Workers binding (no external service/creds); runs locally under `wrangler dev`; durable (Time Travel + backups). (Superseded Supabase Postgres — see DB REVISION note.) |
 | Auth | Custom JWT cookie, single shared password | "One shared password" doesn't map to per-user Supabase Auth |
 | Media storage | AWS S3 via `aws4fetch` | User requirement; `aws4fetch` is fetch-based and Worker-friendly |
 | Generation | fal **queue** (submit → status → result) + client polling | Video jobs run up to 10 min (`TIMEOUTS.video = 600_000`); a Worker cannot hold a request open that long |
@@ -193,11 +210,11 @@ Biography mode is identical with `makeBioPlan` / stage portraits / silent shots.
 ## Environment variables
 
 ```
-APP_PASSWORD_HASH     # bcrypt/scrypt hash of the shared password
+APP_PASSWORD_HASH     # PBKDF2 salt:hash of the shared password
 SESSION_SECRET        # HMAC secret for the JWT cookie
 FAL_KEY               # org-wide fal.ai key
-SUPABASE_URL
-SUPABASE_SERVICE_KEY  # service-role key (server-only)
+# DB is Cloudflare D1 — NOT an env var; it's a `d1_databases` binding named DB
+# in wrangler.jsonc, reached via getCloudflareContext().env.DB (no URL/key).
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 S3_BUCKET
