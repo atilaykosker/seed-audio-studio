@@ -10,6 +10,7 @@ import { SessionSidebar } from '@/components/SessionSidebar'
 import { useStore } from '@/store/useStore'
 import { estimateBioCost, estimatePlanCost, formatUSD } from '@/lib/cost'
 import { cn } from '@/lib/utils'
+import * as api from '@/lib/api'
 import type { Clip } from '@/lib/types'
 
 export function Studio() {
@@ -55,10 +56,16 @@ export function Studio() {
               AI Video
             </span>
           </div>
-          <span className="ml-auto hidden sm:inline-flex items-center gap-1.5 rounded-full border bg-[var(--overlay)] px-2.5 py-1 text-[11px] text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400/60" />
-            Bring your own key
-          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              await api.logout()
+              window.location.href = '/login'
+            }}
+            className="ml-auto text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Log out
+          </button>
         </div>
       </header>
 
