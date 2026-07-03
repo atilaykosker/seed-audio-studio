@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "ES2022"],
+    "lib": ["dom", "dom.iterable", "ES2023"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "jsx": "preserve",
@@ -19,8 +19,18 @@
     "isolatedModules": true,
     // TS 6.0 flipped this default to true, which breaks the side-effect
     // import of ./globals.css in app/layout.tsx. Keep it false.
-    "noUncheckedSideEffectImports": false
+    "noUncheckedSideEffectImports": false,
+    // Carried over from the deleted tsconfig.app.json so src/** (now covered by
+    // this single project) keeps the same strictness it had under Vite.
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["next-env.d.ts", "app/**/*", "middleware.ts", "src/server/**/*", ".next/types/**/*.ts", "worker-configuration.d.ts"],
+  "include": ["next-env.d.ts", "worker-configuration.d.ts", "app/**/*", "middleware.ts", "src/**/*", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
