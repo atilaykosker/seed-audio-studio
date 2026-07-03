@@ -1,57 +1,68 @@
 // src/server/db/characters.ts
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { D1Database } from '@cloudflare/workers-types'
 import type { CharacterImage } from '../../lib/types'
-import type { CharacterRow } from './rows'
+import type { CharacterRow, CharacterInsert } from './rows'
 import { characterToInsert } from './mappers'
 
-export async function upsertCharacter(db: SupabaseClient, c: CharacterImage, imageKey: string): Promise<CharacterRow> {
-  const { data, error } = await db
-    .from('character_library')
-    .upsert(characterToInsert(c, imageKey), { onConflict: 'name_normalized' })
-    .select('*')
-    .single()
-  if (error) throw error
-  return data as CharacterRow
+async function upsertRow(db: D1Database, insert: CharacterInsert): Promise<CharacterRow> {
+  const id = crypto.randomUUID()
+  const now = new Date().toISOString()
+  await db
+    .prepare(
+      `insert into character_library (id,name,image_key,source,request_id,status,created_at)
+       values (?,?,?,?,?,?,?)
+       on conflict(name_normalized) do update set
+         image_key = excluded.image_key,
+         source = excluded.source,
+         status = excluded.status,
+         request_id = excluded.request_id`,
+    )
+    .bind(id, insert.name, insert.image_key, insert.source, insert.request_id, insert.status, now)
+    .run()
+  const row = await db
+    .prepare('select * from character_library where name_normalized = lower(?)')
+    .bind(insert.name)
+    .first<CharacterRow>()
+  if (!row) throw new Error('character upsert failed to read back the row')
+  return row
 }
 
-export async function listCharacters(db: SupabaseClient): Promise<CharacterRow[]> {
-  const { data, error } = await db.from('character_library').select('*').order('created_at', { ascending: true })
-  if (error) throw error
-  return (data ?? []) as CharacterRow[]
+export async function upsertCharacter(db: D1Database, c: CharacterImage, imageKey: string): Promise<CharacterRow> {
+  return upsertRow(db, characterToInsert(c, imageKey))
 }
 
-export async function deleteCharacter(db: SupabaseClient, id: string): Promise<void> {
-  const { error } = await db.from('character_library').delete().eq('id', id)
-  if (error) throw error
-}
-
-export async function insertPendingCharacter(db: SupabaseClient, c: CharacterImage, requestId: string): Promise<CharacterRow> {
+export async function insertPendingCharacter(db: D1Database, c: CharacterImage, requestId: string): Promise<CharacterRow> {
   // Upsert on name_normalized: character_library has a unique index on lower(name), so a
   // repeated/retried/reused character name must reset the existing row rather than collide.
-  const { data, error } = await db
-    .from('character_library')
-    .upsert({ ...characterToInsert(c, ''), request_id: requestId, status: 'queued' }, { onConflict: 'name_normalized' })
-    .select('*')
-    .single()
-  if (error) throw error
-  return data as CharacterRow
+  return upsertRow(db, { ...characterToInsert(c, ''), request_id: requestId, status: 'queued' })
 }
 
-export async function finishCharacter(db: SupabaseClient, id: string, imageKey: string): Promise<void> {
-  const { error } = await db
-    .from('character_library')
-    .update({ image_key: imageKey, status: 'done', request_id: null })
-    .eq('id', id)
-  if (error) throw error
+export async function finishCharacter(db: D1Database, id: string, imageKey: string): Promise<void> {
+  await db
+    .prepare("update character_library set image_key = ?, status = 'done', request_id = null where id = ?")
+    .bind(imageKey, id)
+    .run()
 }
 
-export async function setCharacterError(db: SupabaseClient, id: string): Promise<void> {
-  const { error } = await db.from('character_library').update({ status: 'error', request_id: null }).eq('id', id)
-  if (error) throw error
+export async function setCharacterError(db: D1Database, id: string): Promise<void> {
+  await db
+    .prepare("update character_library set status = 'error', request_id = null where id = ?")
+    .bind(id)
+    .run()
 }
 
-export async function getCharacter(db: SupabaseClient, id: string): Promise<CharacterRow | null> {
-  const { data, error } = await db.from('character_library').select('*').eq('id', id).single()
-  if (error && (error as { code?: string }).code !== 'PGRST116') throw error
-  return (data as CharacterRow) ?? null
+export async function getCharacter(db: D1Database, id: string): Promise<CharacterRow | null> {
+  const row = await db.prepare('select * from character_library where id = ?').bind(id).first<CharacterRow>()
+  return row ?? null
+}
+
+export async function listCharacters(db: D1Database): Promise<CharacterRow[]> {
+  const { results } = await db
+    .prepare('select * from character_library order by created_at asc, rowid asc')
+    .all<CharacterRow>()
+  return results
+}
+
+export async function deleteCharacter(db: D1Database, id: string): Promise<void> {
+  await db.prepare('delete from character_library where id = ?').bind(id).run()
 }
