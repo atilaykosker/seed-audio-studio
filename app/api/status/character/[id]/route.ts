@@ -3,7 +3,7 @@ import { readEnv } from '../../../env'
 import { configureFal, jobStatus, jobResult, downloadToBytes } from '@/src/server/fal/queue'
 import { ENDPOINTS } from '@/src/services/fal/client'
 import { mapFalError } from '@/src/services/fal/errors'
-import { getSupabase } from '@/src/server/db/client'
+import { getDb } from '@/src/server/db/client'
 import { getCharacter, finishCharacter, setCharacterError } from '@/src/server/db/characters'
 import { makeS3 } from '@/src/server/storage/s3'
 
@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const env = readEnv()
   configureFal(env.FAL_KEY)
-  const db = getSupabase(env)
+  const db = getDb()
   const s3 = makeS3(env)
   const row = await getCharacter(db, id)
   if (!row) return NextResponse.json({ error: 'not found' }, { status: 404 })

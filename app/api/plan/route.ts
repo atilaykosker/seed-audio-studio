@@ -5,7 +5,7 @@ import { DEFAULT_MODEL, DEFAULT_VIDEO_MODEL } from '@/src/services/fal/client'
 import { mapFalError } from '@/src/services/fal/errors'
 import { configureFal } from '@/src/server/fal/queue'
 import { readEnv } from '../env'
-import { getSupabase } from '@/src/server/db/client'
+import { getDb } from '@/src/server/db/client'
 import { createSession } from '@/src/server/db/sessions'
 import { insertClips } from '@/src/server/db/clips'
 import { rowToClip } from '@/src/server/db/mappers'
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const env = readEnv()
   configureFal(env.FAL_KEY)
-  const db = getSupabase(env)
+  const db = getDb()
   const videoModel = body.videoModel ?? DEFAULT_VIDEO_MODEL
 
   try {

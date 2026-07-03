@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { readEnv } from '../../env'
 import { configureFal, submit } from '@/src/server/fal/queue'
 import { mapFalError } from '@/src/services/fal/errors'
-import { getSupabase } from '@/src/server/db/client'
+import { getDb } from '@/src/server/db/client'
 import { getSessionRow } from '@/src/server/db/sessions'
 import { getClipBySceneId, updateClipStatus } from '@/src/server/db/clips'
 import { listCharacters } from '@/src/server/db/characters'
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
   const env = readEnv()
   configureFal(env.FAL_KEY)
-  const db = getSupabase(env)
+  const db = getDb()
   const s3 = makeS3(env)
 
   const session = await getSessionRow(db, sessionId)

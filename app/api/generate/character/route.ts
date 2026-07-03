@@ -3,7 +3,7 @@ import type { Character, CharacterImage, BioStage } from '@/src/lib/types'
 import { readEnv } from '../../env'
 import { configureFal, submit } from '@/src/server/fal/queue'
 import { mapFalError } from '@/src/services/fal/errors'
-import { getSupabase } from '@/src/server/db/client'
+import { getDb } from '@/src/server/db/client'
 import { insertPendingCharacter } from '@/src/server/db/characters'
 import { characterMintJob, stageMintJob, type FalJob } from '@/src/server/pipeline/inputs'
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   const env = readEnv()
   configureFal(env.FAL_KEY)
-  const db = getSupabase(env)
+  const db = getDb()
   try {
     const requestId = await submit(job.endpointId, job.input)
     const draft: CharacterImage = { id: '', name, url: '', source: 'minted', createdAt: 0 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { readEnv } from '../../../env'
 import { configureFal, jobStatus, jobResult, downloadToBytes, submit } from '@/src/server/fal/queue'
 import { mapFalError } from '@/src/services/fal/errors'
-import { getSupabase } from '@/src/server/db/client'
+import { getDb } from '@/src/server/db/client'
 import { getClip, updateClipStatus } from '@/src/server/db/clips'
 import { getSessionRow } from '@/src/server/db/sessions'
 import { makeS3 } from '@/src/server/storage/s3'
@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const env = readEnv()
   configureFal(env.FAL_KEY)
-  const db = getSupabase(env)
+  const db = getDb()
   const s3 = makeS3(env)
 
   const clip = await getClip(db, id)
