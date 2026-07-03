@@ -1,24 +1,21 @@
--- supabase/migrations/0001_init.sql
--- Bookticle Studio — initial schema (single shared workspace, no per-user rows).
-
 create table if not exists sessions (
-  id           uuid primary key default gen_random_uuid(),
+  id           text primary key,
   title        text not null,
-  brief        jsonb not null,
-  plan         jsonb,
-  bio_plan     jsonb,
+  brief        text not null,            -- JSON
+  plan         text,                     -- JSON | null
+  bio_plan     text,                     -- JSON | null
   category     text,
   video_model  text not null,
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
+  created_at   text not null,            -- ISO 8601
+  updated_at   text not null
 );
 
 create table if not exists clips (
-  id           uuid primary key default gen_random_uuid(),
-  session_id   uuid not null references sessions(id) on delete cascade,
+  id           text primary key,
+  session_id   text not null references sessions(id) on delete cascade,
   scene_id     text not null,
   title        text not null,
-  speakers     jsonb not null default '[]'::jsonb,
+  speakers     text not null default '[]',  -- JSON string[]
   prompt       text not null default '',
   status       text not null default 'pending',
   phase        text,
@@ -28,21 +25,18 @@ create table if not exists clips (
   video_key    text,
   duration_sec integer,
   error        text,
-  created_at   timestamptz not null default now()
+  created_at   text not null
 );
 create index if not exists clips_session_id_idx on clips(session_id);
 
 create table if not exists character_library (
-  id           uuid primary key default gen_random_uuid(),
+  id           text primary key,
   name         text not null,
   name_normalized text generated always as (lower(name)) stored,
   image_key    text not null,
   source       text not null default 'minted',
   request_id   text,
   status       text not null default 'done',
-  created_at   timestamptz not null default now()
+  created_at   text not null
 );
--- Case-insensitive reuse key (matches the store's lowercased name lookup).
--- A generated column (rather than an expression index) so PostgREST's
--- on_conflict= can infer the unique constraint by column name.
 create unique index if not exists character_library_name_normalized_key on character_library(name_normalized);
