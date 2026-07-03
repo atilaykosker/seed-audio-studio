@@ -1,16 +1,12 @@
 import { create } from 'zustand'
-import { uid, sessionTitle } from '@/lib/utils'
-import { mapFalError } from '@/services/fal/errors'
-import { DEFAULT_MODEL, DEFAULT_VIDEO_MODEL, type VideoModelId } from '@/services/fal/client'
-import { makePlan, makeBioPlan } from '@/services/studio/plan'
-import { generateFromPlan, generateSceneClip, generateBiography, generateBioShot } from '@/services/studio/generate'
-import type { Brief, Clip, CharacterImage, BiographyPlan, Plan, Session, StudioStatus } from '@/lib/types'
+import { uid } from '@/lib/utils'
+import * as api from '@/lib/api'
+import type { SessionSummary } from '@/lib/api'
+import { DEFAULT_MODEL, DEFAULT_VIDEO_MODEL } from '@/services/fal/client'
+import type { Brief, Clip, CharacterImage, BiographyPlan, Plan, StudioStatus } from '@/lib/types'
 
 const MODEL_KEY = 'bookticle-studio:model'
 const VIDEO_MODEL_KEY = 'bookticle-studio:videoModel'
-const CHAR_KEY = 'bookticle-studio:characters'
-const SESS_KEY = 'bookticle-studio:sessions'
-const ACTIVE_KEY = 'bookticle-studio:activeSession'
 
 export interface Toast {
   id: string
@@ -19,26 +15,27 @@ export interface Toast {
   message?: string
 }
 
-function loadCharacterLibrary(): CharacterImage[] {
-  try {
-    return JSON.parse(localStorage.getItem(CHAR_KEY) ?? '[]') as CharacterImage[]
-  } catch {
-    return []
-  }
-}
-function saveCharacterLibrary(v: CharacterImage[]) {
-  localStorage.setItem(CHAR_KEY, JSON.stringify(v))
+/** Maps any thrown SDK error (ApiError or otherwise) to a user-facing toast payload. */
+function errorToast(e: unknown): Omit<Toast, 'id'> {
+  const err = e as { friendly?: { title?: string }; message?: string } | undefined
+  return { kind: 'error', title: 'Something went wrong', message: err?.friendly?.title ?? err?.message }
 }
 
-function loadSessions(): Session[] {
-  try {
-    return JSON.parse(localStorage.getItem(SESS_KEY) ?? '[]') as Session[]
-  } catch {
-    return []
+/** Polls `fn` until `done(value)` is true, calling `onTick` with every observed value. Throws on timeout. */
+async function pollUntil<T>(
+  fn: () => Promise<T>,
+  done: (v: T) => boolean,
+  onTick: (v: T) => void,
+  { intervalMs = 4000, timeoutMs = 720000 } = {},
+): Promise<T> {
+  const start = Date.now()
+  for (;;) {
+    const v = await fn()
+    onTick(v)
+    if (done(v)) return v
+    if (Date.now() - start > timeoutMs) throw new Error('timed out')
+    await new Promise((r) => setTimeout(r, intervalMs))
   }
-}
-function saveSessions(v: Session[]) {
-  localStorage.setItem(SESS_KEY, JSON.stringify(v)) // may throw QuotaExceededError
 }
 
 const DEFAULT_BRIEF: Brief = {
@@ -53,8 +50,6 @@ const DEFAULT_BRIEF: Brief = {
 }
 
 interface Store {
-  key: string | null
-  keyDialogOpen: boolean
   toasts: Toast[]
 
   model: string
@@ -62,7 +57,7 @@ interface Store {
   brief: Brief
   characterLibrary: CharacterImage[]
 
-  sessions: Session[]
+  sessions: SessionSummary[]
   activeSessionId: string | null
 
   plan: Plan | null
@@ -72,10 +67,10 @@ interface Store {
   status: StudioStatus
   currentStep: string | null
 
-  setKey: (k: string | null) => void
-  setKeyDialogOpen: (v: boolean) => void
   toast: (t: Omit<Toast, 'id'>) => void
   dismissToast: (id: string) => void
+
+  hydrate: () => Promise<void>
 
   setModel: (m: string) => void
   setVideoModel: (m: string) => void
@@ -83,62 +78,63 @@ interface Store {
   editClipPrompt: (sceneId: string, text: string) => void
 
   addCharacterImage: (img: CharacterImage) => void
-  removeCharacterImage: (id: string) => void
-  clearCharacterLibrary: () => void
+  removeCharacterImage: (id: string) => Promise<void>
+  clearCharacterLibrary: () => Promise<void>
 
-  beginSession: () => void
-  saveActiveSession: () => void
   newSession: () => void
-  loadSession: (id: string) => void
-  renameSession: (id: string, title: string) => void
-  deleteSession: (id: string) => void
+  loadSession: (id: string) => Promise<void>
+  renameSession: (id: string, title: string) => Promise<void>
+  deleteSession: (id: string) => Promise<void>
 
   clearResults: () => void
   runStudio: () => Promise<void>
   regenScene: (sceneId: string) => Promise<void>
 }
 
-const _sessions0 = loadSessions()
-const _activeId0 = localStorage.getItem(ACTIVE_KEY)
-const _active0 = _sessions0.find((x) => x.id === _activeId0) ?? null
-if (_activeId0 && !_active0) localStorage.removeItem(ACTIVE_KEY)
-
 export const useStore = create<Store>((set, get) => ({
-  key: null,
-  keyDialogOpen: false,
   toasts: [],
 
-  model: localStorage.getItem(MODEL_KEY) ?? DEFAULT_MODEL,
-  videoModel: _active0?.videoModel ?? localStorage.getItem(VIDEO_MODEL_KEY) ?? DEFAULT_VIDEO_MODEL,
-  brief: _active0 ? { ...DEFAULT_BRIEF, ..._active0.brief } : DEFAULT_BRIEF,
-  characterLibrary: loadCharacterLibrary(),
+  model: DEFAULT_MODEL,
+  videoModel: DEFAULT_VIDEO_MODEL,
+  brief: DEFAULT_BRIEF,
+  characterLibrary: [],
 
-  sessions: _sessions0,
-  activeSessionId: _active0 ? _activeId0 : null,
+  sessions: [],
+  activeSessionId: null,
 
-  plan: _active0?.plan ?? null,
-  bioPlan: _active0?.bioPlan ?? null,
-  category: _active0?.category ?? null,
-  clips: _active0?.clips ?? [],
-  status: _active0 && _active0.clips.length ? 'done' : 'idle',
+  plan: null,
+  bioPlan: null,
+  category: null,
+  clips: [],
+  status: 'idle',
   currentStep: null,
 
-  setKey: (k) => set({ key: k }),
-  setKeyDialogOpen: (v) => set({ keyDialogOpen: v }),
   toast: (t) => set((s) => ({ toasts: [...s.toasts, { ...t, id: uid() }] })),
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
+  hydrate: async () => {
+    try {
+      const [sessions, characterLibrary] = await Promise.all([api.listSessions(), api.listCharacters()])
+      const model = (typeof window !== 'undefined' && localStorage.getItem(MODEL_KEY)) || DEFAULT_MODEL
+      const videoModel = (typeof window !== 'undefined' && localStorage.getItem(VIDEO_MODEL_KEY)) || DEFAULT_VIDEO_MODEL
+      set({ sessions, characterLibrary, model, videoModel })
+    } catch (e) {
+      get().toast(errorToast(e))
+    }
+  },
+
   setModel: (m) => {
-    localStorage.setItem(MODEL_KEY, m)
+    if (typeof window !== 'undefined') localStorage.setItem(MODEL_KEY, m)
     set({ model: m })
   },
   setVideoModel: (m) => {
-    localStorage.setItem(VIDEO_MODEL_KEY, m)
+    if (typeof window !== 'undefined') localStorage.setItem(VIDEO_MODEL_KEY, m)
     set({ videoModel: m })
   },
   setBrief: (patch) => set((s) => ({ brief: { ...s.brief, ...patch } })),
 
   editClipPrompt: (sceneId, text) => {
+    // TODO(plan-task-5): persist via api.editClipPrompt
     set((s) => {
       const clips = s.clips.map((c) => (c.sceneId === sceneId ? { ...c, prompt: text } : c))
       if (s.bioPlan) {
@@ -160,290 +156,224 @@ export const useStore = create<Store>((set, get) => ({
       }
       return { clips }
     })
-    get().saveActiveSession()
   },
 
   addCharacterImage: (img) =>
-    set((s) => {
-      const next = [img, ...s.characterLibrary.filter((x) => x.id !== img.id)]
-      saveCharacterLibrary(next)
-      return { characterLibrary: next }
-    }),
-  removeCharacterImage: (id) =>
-    set((s) => {
-      const next = s.characterLibrary.filter((x) => x.id !== id)
-      saveCharacterLibrary(next)
-      return { characterLibrary: next }
-    }),
-  clearCharacterLibrary: () => {
-    saveCharacterLibrary([])
+    set((s) => ({ characterLibrary: [img, ...s.characterLibrary.filter((x) => x.id !== img.id)] })),
+
+  removeCharacterImage: async (id) => {
+    try {
+      await api.deleteCharacter(id)
+      set((s) => ({ characterLibrary: s.characterLibrary.filter((x) => x.id !== id) }))
+    } catch (e) {
+      get().toast(errorToast(e))
+    }
+  },
+
+  clearCharacterLibrary: async () => {
+    const ids = get().characterLibrary.map((c) => c.id)
+    for (const id of ids) {
+      try {
+        await api.deleteCharacter(id)
+      } catch (e) {
+        get().toast(errorToast(e))
+      }
+    }
     set({ characterLibrary: [] })
   },
 
-  beginSession: () => {
-    const s = get()
-    if (s.activeSessionId) return
-    const now = Date.now()
-    const sess: Session = {
-      id: uid(),
-      title: sessionTitle(s.brief.idea),
-      createdAt: now,
-      updatedAt: now,
-      brief: s.brief,
+  newSession: () =>
+    set({
+      activeSessionId: null,
+      brief: DEFAULT_BRIEF,
       plan: null,
       bioPlan: null,
       category: null,
       clips: [],
-      videoModel: s.videoModel,
-    }
-    const next = [sess, ...s.sessions]
-    try {
-      saveSessions(next)
-    } catch {
-      get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
-      return
-    }
-    localStorage.setItem(ACTIVE_KEY, sess.id)
-    set({ sessions: next, activeSessionId: sess.id })
-  },
-
-  saveActiveSession: () => {
-    const s = get()
-    if (!s.activeSessionId) return
-    const next = s.sessions.map((x) =>
-      x.id === s.activeSessionId
-        ? { ...x, brief: s.brief, plan: s.plan, bioPlan: s.bioPlan, category: s.category, clips: s.clips, videoModel: s.videoModel, updatedAt: Date.now() }
-        : x,
-    )
-    try {
-      saveSessions(next)
-    } catch {
-      get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
-      return
-    }
-    set({ sessions: next })
-  },
-
-  newSession: () => {
-    localStorage.removeItem(ACTIVE_KEY)
-    set({ activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, bioPlan: null, category: null, clips: [], status: 'idle', currentStep: null })
-  },
-
-  loadSession: (id) => {
-    const sess = get().sessions.find((x) => x.id === id)
-    if (!sess) return
-    localStorage.setItem(ACTIVE_KEY, id)
-    set({
-      activeSessionId: id,
-      brief: { ...DEFAULT_BRIEF, ...sess.brief },
-      plan: sess.plan,
-      bioPlan: sess.bioPlan ?? null,
-      category: sess.category,
-      clips: sess.clips,
-      videoModel: sess.videoModel ?? get().videoModel,
-      status: sess.clips.length ? 'done' : 'idle',
+      status: 'idle',
       currentStep: null,
-    })
+    }),
+
+  loadSession: async (id) => {
+    try {
+      const s = await api.getSession(id)
+      if (!s) return
+      set({
+        activeSessionId: id,
+        brief: { ...DEFAULT_BRIEF, ...s.brief },
+        plan: s.plan,
+        bioPlan: s.bioPlan,
+        category: s.category,
+        clips: s.clips,
+        videoModel: s.videoModel ?? get().videoModel,
+        status: s.clips.length ? 'done' : 'idle',
+        currentStep: null,
+      })
+    } catch (e) {
+      get().toast(errorToast(e))
+    }
   },
 
-  renameSession: (id, title) =>
-    set((s) => {
-      const t = title.trim() || 'Untitled'
-      const next = s.sessions.map((x) => (x.id === id ? { ...x, title: t, updatedAt: Date.now() } : x))
-      try {
-        saveSessions(next)
-      } catch {
-        get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
-      }
-      return { sessions: next }
-    }),
+  renameSession: async (id, title) => {
+    const t = title.trim() || 'Untitled'
+    try {
+      await api.renameSession(id, t)
+      set((s) => ({ sessions: s.sessions.map((x) => (x.id === id ? { ...x, title: t } : x)) }))
+    } catch (e) {
+      get().toast(errorToast(e))
+    }
+  },
 
-  deleteSession: (id) =>
-    set((s) => {
-      const next = s.sessions.filter((x) => x.id !== id)
-      try {
-        saveSessions(next)
-      } catch {
-        get().toast({ kind: 'error', title: 'Storage full', message: 'Delete old sessions to save new ones.' })
-      }
-      if (s.activeSessionId === id) {
-        localStorage.removeItem(ACTIVE_KEY)
-        return { sessions: next, activeSessionId: null, brief: DEFAULT_BRIEF, plan: null, bioPlan: null, category: null, clips: [], status: 'idle', currentStep: null }
-      }
-      return { sessions: next }
-    }),
+  deleteSession: async (id) => {
+    try {
+      await api.deleteSession(id)
+    } catch (e) {
+      get().toast(errorToast(e))
+      return
+    }
+    set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }))
+    if (get().activeSessionId === id) {
+      get().clearResults()
+      set({ activeSessionId: null })
+    }
+  },
 
   clearResults: () => set({ plan: null, bioPlan: null, category: null, clips: [], status: 'idle', currentStep: null }),
 
   runStudio: async () => {
-    const { key, brief, model, videoModel } = get()
-    if (!key) {
-      set({ keyDialogOpen: true })
-      return
-    }
+    const { brief, model, videoModel } = get()
     if (!brief.idea.trim()) {
       get().toast({ kind: 'error', title: 'Add a brief', message: 'Describe the video you want to generate.' })
       return
     }
-    get().beginSession()
+
+    set({
+      status: 'planning',
+      currentStep: brief.type === 'biography' ? 'Planning biography…' : 'Planning shots…',
+      plan: null,
+      bioPlan: null,
+      clips: [],
+    })
+
+    let res: Awaited<ReturnType<typeof api.createPlan>>
+    try {
+      res = await api.createPlan(brief, { model, videoModel })
+    } catch (e) {
+      set({ status: 'error', currentStep: null })
+      get().toast(errorToast(e))
+      return
+    }
+
+    set({
+      activeSessionId: res.sessionId,
+      plan: res.plan ?? null,
+      bioPlan: res.bioPlan ?? null,
+      category: res.category,
+      clips: res.clips,
+      status: 'generating',
+    })
+    void get().hydrate()
 
     const patchClipByScene = (sceneId: string, patch: Partial<Clip>) =>
       set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...patch } : c)) }))
 
-    if (brief.type === 'biography') {
-      set({ status: 'planning', currentStep: 'Planning biography…', plan: null, bioPlan: null, clips: [] })
-      let bio: BiographyPlan
-      try {
-        bio = await makeBioPlan(brief, model)
-      } catch (e) {
-        const fe = mapFalError(e)
-        set({ status: 'error', currentStep: null })
-        get().toast({ kind: 'error', title: fe.title, message: fe.message })
-        return
-      }
-      const clips: Clip[] = bio.pages.flatMap((page) =>
-        page.shots.map((shot, i) => ({
-          id: uid(),
-          sceneId: shot.id,
-          title: `Page ${page.index} · Shot ${i + 1}`,
-          speakers: [],
-          prompt: shot.visual,
-          status: 'pending' as const,
-        })),
-      )
-      set({ bioPlan: bio, category: 'Biography', clips, status: 'generating' })
-      get().saveActiveSession()
-
-      await generateBiography(
-        bio,
-        { characterLibrary: get().characterLibrary, videoModel: videoModel as VideoModelId, aspect: brief.aspect, shotSec: brief.shotSec },
-        {
-          onCharacterImage: (img) => get().addCharacterImage(img),
-          onSceneStart: (sceneId) => {
-            set({ currentStep: 'Generating shot…' })
-            patchClipByScene(sceneId, { status: 'running' })
-          },
-          onKeyframe: (sceneId, url) => patchClipByScene(sceneId, { imageUrl: url }),
-          onScenePhase: (sceneId, phase) => patchClipByScene(sceneId, { phase }),
-          onScene: (sceneId, r) => {
-            patchClipByScene(sceneId, { status: 'done', videoUrl: r.url })
-            get().saveActiveSession()
-          },
-          onError: (scope, message) => {
-            if (scope.startsWith('scene:')) {
-              patchClipByScene(scope.slice('scene:'.length), { status: 'error', error: message })
-            } else {
-              get().toast({ kind: 'error', title: 'Generation issue', message })
-            }
-          },
-        },
-      )
-      set({ status: 'done', currentStep: null })
-      get().saveActiveSession()
-      return
-    }
-
-    // story
-    set({ status: 'planning', currentStep: 'Planning shots…', plan: null, bioPlan: null, clips: [] })
-    let plan: Plan
-    try {
-      plan = await makePlan(brief, model)
-    } catch (e) {
-      const fe = mapFalError(e)
-      set({ status: 'error', currentStep: null })
-      get().toast({ kind: 'error', title: fe.title, message: fe.message })
-      return
-    }
-
-    const clips: Clip[] = plan.scenes.map((sc) => ({
-      id: uid(),
-      sceneId: sc.id,
-      title: sc.title,
-      speakers: sc.speakers,
-      prompt: [sc.visual, sc.dialogue].filter(Boolean).join('\n'),
-      status: 'pending',
-    }))
-    set({ plan, category: plan.category, clips, status: 'generating' })
-    get().saveActiveSession()
-
-    await generateFromPlan(
-      plan,
-      { characterLibrary: get().characterLibrary, videoModel: videoModel as VideoModelId, aspect: brief.aspect },
-      {
-        onCharacterImage: (img) => get().addCharacterImage(img),
-        onSceneStart: (sceneId) => {
-          set({ currentStep: 'Generating video…' })
-          patchClipByScene(sceneId, { status: 'running' })
-        },
-        onKeyframe: (sceneId, url) => patchClipByScene(sceneId, { imageUrl: url }),
-        onScenePhase: (sceneId, phase) => patchClipByScene(sceneId, { phase }),
-        onScene: (sceneId, r) => {
-          patchClipByScene(sceneId, { status: 'done', videoUrl: r.url })
-          get().saveActiveSession()
-        },
-        onError: (scope, message) => {
-          if (scope.startsWith('scene:')) {
-            patchClipByScene(scope.slice('scene:'.length), { status: 'error', error: message })
+    // Mint characters before scenes — the server's scene-gen needs the library populated.
+    if (brief.type === 'biography' && res.bioPlan) {
+      const bio = res.bioPlan
+      for (const stage of bio.stages) {
+        const name = `${bio.subject} — ${stage.label}`
+        if (get().characterLibrary.some((c) => c.name.toLowerCase() === name.toLowerCase())) continue
+        set({ currentStep: `Creating ${name}…` })
+        try {
+          const { characterId } = await api.generateStage(bio.subject, stage, bio.style)
+          const s = await pollUntil(
+            () => api.characterStatus(characterId),
+            (v) => v.status === 'done' || v.status === 'error',
+            () => {},
+          )
+          if (s.status === 'done' && s.url) {
+            get().addCharacterImage({ id: characterId, name, url: s.url, source: 'minted', createdAt: Date.now() })
           } else {
-            get().toast({ kind: 'error', title: 'Generation issue', message })
+            get().toast({ kind: 'error', title: s.error?.title ?? 'Character generation failed' })
           }
-        },
-      },
-    )
+        } catch (e) {
+          get().toast(errorToast(e))
+        }
+      }
+    } else if (res.plan) {
+      for (const ch of res.plan.characters) {
+        if (get().characterLibrary.some((c) => c.name.toLowerCase() === ch.name.toLowerCase())) continue
+        set({ currentStep: `Creating ${ch.name}…` })
+        try {
+          const { characterId } = await api.generateCharacter(ch)
+          const s = await pollUntil(
+            () => api.characterStatus(characterId),
+            (v) => v.status === 'done' || v.status === 'error',
+            () => {},
+          )
+          if (s.status === 'done' && s.url) {
+            get().addCharacterImage({ id: characterId, name: ch.name, url: s.url, source: 'minted', createdAt: Date.now() })
+          } else {
+            get().toast({ kind: 'error', title: s.error?.title ?? 'Character generation failed' })
+          }
+        } catch (e) {
+          get().toast(errorToast(e))
+        }
+      }
+    }
+
+    // Generate scenes in clip order.
+    for (const clip of res.clips) {
+      patchClipByScene(clip.sceneId, { status: 'running' })
+      set({ currentStep: `Generating ${clip.title}…` })
+      try {
+        await api.generateScene(res.sessionId, clip.sceneId)
+        const s = await pollUntil(
+          () => api.clipStatus(clip.id),
+          (v) => v.status === 'done' || v.status === 'error',
+          (v) => {
+            if (v.phase) patchClipByScene(clip.sceneId, { phase: v.phase as Clip['phase'] })
+          },
+        )
+        if (s.status === 'done') {
+          patchClipByScene(clip.sceneId, { status: 'done', videoUrl: s.videoUrl, phase: 'done' })
+        } else {
+          patchClipByScene(clip.sceneId, { status: 'error', error: s.error?.title ?? 'Generation failed' })
+        }
+      } catch (e) {
+        patchClipByScene(clip.sceneId, { status: 'error', error: errorToast(e).message ?? 'Generation failed' })
+      }
+    }
+
     set({ status: 'done', currentStep: null })
-    get().saveActiveSession()
   },
 
   regenScene: async (sceneId) => {
-    const { plan, bioPlan, characterLibrary, brief, videoModel } = get()
+    const { activeSessionId, clips } = get()
+    const clip = clips.find((c) => c.sceneId === sceneId)
+    if (!activeSessionId || !clip) return
+
     const patch = (p: Partial<Clip>) =>
       set((s) => ({ clips: s.clips.map((c) => (c.sceneId === sceneId ? { ...c, ...p } : c)) }))
 
-    if (brief.type === 'biography' && bioPlan) {
-      const shot = bioPlan.pages.flatMap((pg) => pg.shots).find((sh) => sh.id === sceneId)
-      if (!shot) return
-      patch({ status: 'running', error: undefined, videoUrl: undefined, imageUrl: undefined, phase: undefined })
-      try {
-        const libByName = new Map<string, string>()
-        for (const img of characterLibrary) libByName.set(img.name.toLowerCase(), img.url)
-        const stageImageById = new Map<string, string>()
-        for (const stage of bioPlan.stages) {
-          const url = libByName.get(`${bioPlan.subject} — ${stage.label}`.toLowerCase())
-          if (url) stageImageById.set(stage.id, url)
-        }
-        const r = await generateBioShot(
-          { shot, stageImageById, style: bioPlan.style, videoModel: videoModel as VideoModelId, aspect: brief.aspect, shotSec: brief.shotSec },
-          { onKeyframe: (_id, url) => patch({ imageUrl: url }), onScenePhase: (_id, phase) => patch({ phase }) },
-        )
-        patch({ status: 'done', videoUrl: r.url })
-      } catch (e) {
-        const fe = mapFalError(e)
-        patch({ status: 'error', error: fe.message })
-        get().toast({ kind: 'error', title: fe.title, message: fe.message })
-      }
-      get().saveActiveSession()
-      return
-    }
-
-    if (!plan) return
-    const scene = plan.scenes.find((s) => s.id === sceneId)
-    if (!scene) return
     patch({ status: 'running', error: undefined, videoUrl: undefined, imageUrl: undefined, phase: undefined })
     try {
-      const imageByName = new Map<string, string>()
-      for (const img of characterLibrary) imageByName.set(img.name.toLowerCase(), img.url)
-      const voiceByName = new Map<string, string>()
-      for (const c of plan.characters) voiceByName.set(c.name.toLowerCase(), c.voice)
-      const r = await generateSceneClip(
-        { scene, imageByName, voiceByName, videoModel: videoModel as VideoModelId, aspect: brief.aspect, durationSec: 8 },
-        { onKeyframe: (_id, url) => patch({ imageUrl: url }), onScenePhase: (_id, phase) => patch({ phase }) },
+      await api.generateScene(activeSessionId, sceneId)
+      const s = await pollUntil(
+        () => api.clipStatus(clip.id),
+        (v) => v.status === 'done' || v.status === 'error',
+        (v) => {
+          if (v.phase) patch({ phase: v.phase as Clip['phase'] })
+        },
       )
-      patch({ status: 'done', videoUrl: r.url })
+      if (s.status === 'done') {
+        patch({ status: 'done', videoUrl: s.videoUrl, phase: 'done' })
+      } else {
+        patch({ status: 'error', error: s.error?.title ?? 'Generation failed' })
+      }
     } catch (e) {
-      const fe = mapFalError(e)
-      patch({ status: 'error', error: fe.message })
-      get().toast({ kind: 'error', title: fe.title, message: fe.message })
+      patch({ status: 'error', error: 'Generation failed' })
+      get().toast(errorToast(e))
     }
-    get().saveActiveSession()
   },
 }))

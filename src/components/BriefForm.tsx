@@ -34,7 +34,6 @@ export function BriefForm() {
   const setBrief = useStore((s) => s.setBrief)
   const run = useStore((s) => s.runStudio)
   const status = useStore((s) => s.status)
-  const hasKey = useStore((s) => !!s.key)
   const busy = status === 'planning' || status === 'generating'
   const isBio = brief.type === 'biography'
   const examples = isBio ? BIO_EXAMPLES : STORY_EXAMPLES
@@ -162,9 +161,15 @@ export function BriefForm() {
 
       <VideoModelPicker />
 
-      <Button variant="gradient" size="lg" className="w-full" disabled={busy} onClick={() => run()}>
+      <Button
+        variant="gradient"
+        size="lg"
+        className="w-full"
+        disabled={busy || !brief.idea.trim()}
+        onClick={() => run()}
+      >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-        {busy ? 'Generating…' : hasKey ? (isBio ? 'Generate biography' : 'Generate video') : 'Add key & generate'}
+        {busy ? 'Generating…' : isBio ? 'Generate biography' : 'Generate video'}
       </Button>
     </div>
   )

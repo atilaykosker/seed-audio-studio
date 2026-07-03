@@ -1,6 +1,6 @@
 'use client'
 
-import { Trash2, KeyRound, Library } from 'lucide-react'
+import { Trash2, Library } from 'lucide-react'
 import {
   Button,
   Dialog,
@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui'
 import { useStore } from '@/store/useStore'
-import { clearKey } from '@/services/fal/keyStore'
 import { MODELS } from '@/services/fal/client'
 
 export function SettingsDialog({
@@ -27,7 +26,6 @@ export function SettingsDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
-  const setKey = useStore((s) => s.setKey)
   const clearResults = useStore((s) => s.clearResults)
   const clearCharacterLibrary = useStore((s) => s.clearCharacterLibrary)
   const toast = useStore((s) => s.toast)
@@ -35,18 +33,12 @@ export function SettingsDialog({
   const setModel = useStore((s) => s.setModel)
   const charCount = useStore((s) => s.characterLibrary.length)
 
-  function forgetKey() {
-    clearKey()
-    setKey(null)
-    onOpenChange(false)
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Your key and character library live only in this browser.</DialogDescription>
+          <DialogDescription>Your character library lives on the server.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
@@ -86,9 +78,6 @@ export function SettingsDialog({
             }}
           >
             <Library className="size-4" /> Clear character library ({charCount})
-          </Button>
-          <Button variant="destructive" onClick={forgetKey}>
-            <KeyRound className="size-4" /> Forget API key
           </Button>
         </div>
       </DialogContent>
