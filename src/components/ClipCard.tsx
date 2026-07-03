@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState } from 'react'
 import { Download, RefreshCw, ChevronDown, Loader2, AlertCircle, Film } from 'lucide-react'
 import { Button, Card, Textarea } from '@/components/ui'

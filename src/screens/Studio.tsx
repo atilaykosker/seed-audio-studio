@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import { Clapperboard, Loader2, Menu, Copy, Film } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, CardDescription, Separator } from '@/components/ui'

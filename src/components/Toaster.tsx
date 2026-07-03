@@ -1,3 +1,5 @@
+'use client'
+
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
 import { CheckCircle2, Info, TriangleAlert, X } from 'lucide-react'

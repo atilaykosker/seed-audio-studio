@@ -1,3 +1,5 @@
+'use client'
+
 import { Trash2, KeyRound, Library } from 'lucide-react'
 import {
   Button,

@@ -1,3 +1,5 @@
+'use client'
+
 import { Trash2, Users } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui'
 import { useStore } from '@/store/useStore'

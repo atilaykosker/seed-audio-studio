@@ -1,3 +1,5 @@
+'use client'
+
 import { Sparkles, Loader2 } from 'lucide-react'
 import {
   Button,

@@ -1,3 +1,5 @@
+'use client'
+
 import { Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import { VIDEO_MODELS, getVideoModel } from '@/services/fal/client'

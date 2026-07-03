@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import { Plus, Trash2, Pencil } from 'lucide-react'
 import { useStore } from '@/store/useStore'
