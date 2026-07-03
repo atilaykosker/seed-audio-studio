@@ -2,7 +2,7 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { makeTestDb } from './test-d1'
-import { createSession, getSession, listSessions, renameSession, deleteSession } from './sessions'
+import { createSession, getSession, getSessionRow, listSessions, renameSession, deleteSession, updateSessionPlan } from './sessions'
 import type { Session } from '../../lib/types'
 
 const brief: Session['brief'] = { idea: 'x', durationSec: 8, language: 'EN', speakers: 'auto', genre: 'g', aspect: 'landscape', type: 'story', shotSec: 8 }
@@ -36,5 +36,16 @@ describe('sessions repo (D1)', () => {
     const id = await createSession(db, mk())
     await deleteSession(db, id)
     expect(await getSession(db, id, [])).toBeNull()
+  })
+
+  it('updateSessionPlan writes plan/bioPlan and getSessionRow reflects it', async () => {
+    const db = makeTestDb()
+    const id = await createSession(db, mk())
+    const plan = { category: 'Drama', characters: [], scenes: [{ id: 'sc1', title: 'S', speakers: [], visual: 'edited visual', dialogue: '' }] }
+    await updateSessionPlan(db, id, plan, null)
+    const row = await getSessionRow(db, id)
+    expect(row?.plan?.scenes[0].visual).toBe('edited visual')
+    expect(row?.plan?.scenes[0].dialogue).toBe('')
+    expect(row?.bio_plan).toBeNull()
   })
 })

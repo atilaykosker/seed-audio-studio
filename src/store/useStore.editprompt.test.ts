@@ -1,8 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import * as api from '@/lib/api'
 import { useStore } from './useStore'
 import type { BiographyPlan, Clip, Plan } from '@/lib/types'
 
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return { ...actual, editClipPrompt: vi.fn().mockResolvedValue(undefined) }
+})
+
 beforeEach(() => {
+  vi.mocked(api.editClipPrompt).mockClear()
   useStore.setState({ plan: null, bioPlan: null, clips: [], activeSessionId: null })
 })
 
@@ -22,6 +29,7 @@ describe('editClipPrompt', () => {
     expect(s.plan!.scenes[0].visual).toBe('a calm empty meadow, wide shot')
     expect(s.plan!.scenes[0].dialogue).toBe('')
     expect(s.clips[0].prompt).toBe('a calm empty meadow, wide shot')
+    expect(api.editClipPrompt).toHaveBeenCalledWith('c1', 'a calm empty meadow, wide shot')
   })
 
   it('biography: sets the matching shot.visual to the text and updates clip.prompt', () => {
@@ -39,6 +47,7 @@ describe('editClipPrompt', () => {
     const s = useStore.getState()
     expect(s.bioPlan!.pages[0].shots[0].visual).toBe('a bright study, candlelight, close-up')
     expect(s.clips[0].prompt).toBe('a bright study, candlelight, close-up')
+    expect(api.editClipPrompt).toHaveBeenCalledWith('c1', 'a bright study, candlelight, close-up')
   })
 
   it('only touches the targeted clip/scene', () => {
@@ -60,5 +69,7 @@ describe('editClipPrompt', () => {
     expect(s.plan!.scenes[1].visual).toBe('v2')
     expect(s.plan!.scenes[1].dialogue).toBe('d2')
     expect(s.clips[1].prompt).toBe('v2')
+    expect(api.editClipPrompt).toHaveBeenCalledWith('c1', 'edited')
+    expect(api.editClipPrompt).not.toHaveBeenCalledWith('c2', expect.anything())
   })
 })

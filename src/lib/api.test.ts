@@ -37,4 +37,12 @@ describe('api client', () => {
     const s = await api.clipStatus('c1')
     expect(s.status).toBe('done'); expect(s.videoUrl).toContain('.mp4')
   })
+  it('editClipPrompt PATCHes /api/clips/:id with the text body', async () => {
+    let seenUrl = ''; let seenInit: RequestInit | undefined
+    vi.stubGlobal('fetch', mockFetch(200, { ok: true }, (u, i) => { seenUrl = u; seenInit = i }))
+    await api.editClipPrompt('c1', 'a bright meadow')
+    expect(seenUrl).toBe('/api/clips/c1')
+    expect(seenInit?.method).toBe('PATCH')
+    expect(JSON.parse(String(seenInit?.body))).toEqual({ text: 'a bright meadow' })
+  })
 })

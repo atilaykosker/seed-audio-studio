@@ -97,3 +97,19 @@ describe('getClip (D1)', () => {
     expect(await getClip(db, 'missing')).toBeNull()
   })
 })
+
+describe('updateClipStatus prompt patch (D1)', () => {
+  it('updates the prompt column and getClip reflects it', async () => {
+    const db = makeTestDb()
+    const sessionId = await mkSessionId(db)
+    const [clip] = await insertClips(db, sessionId, [
+      { id: 'a', sceneId: 's1', title: 'T1', speakers: [], prompt: 'old prompt', status: 'pending' },
+    ])
+    await updateClipStatus(db, clip.id, { prompt: 'new prompt' })
+    const updated = await getClip(db, clip.id)
+    expect(updated?.prompt).toBe('new prompt')
+    // untouched fields remain
+    expect(updated?.title).toBe('T1')
+    expect(updated?.status).toBe('pending')
+  })
+})

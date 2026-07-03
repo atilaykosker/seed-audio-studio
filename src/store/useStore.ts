@@ -143,7 +143,6 @@ export const useStore = create<Store>((set, get) => ({
   setBrief: (patch) => set((s) => ({ brief: { ...s.brief, ...patch } })),
 
   editClipPrompt: (sceneId, text) => {
-    // TODO(plan-task-5): persist via api.editClipPrompt
     set((s) => {
       const clips = s.clips.map((c) => (c.sceneId === sceneId ? { ...c, prompt: text } : c))
       if (s.bioPlan) {
@@ -165,6 +164,16 @@ export const useStore = create<Store>((set, get) => ({
       }
       return { clips }
     })
+    const clip = get().clips.find((c) => c.sceneId === sceneId)
+    if (clip) {
+      void (async () => {
+        try {
+          await api.editClipPrompt(clip.id, text)
+        } catch (e) {
+          get().toast(errorToast(e))
+        }
+      })()
+    }
   },
 
   addCharacterImage: (img) =>

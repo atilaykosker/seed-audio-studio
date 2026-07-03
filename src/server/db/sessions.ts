@@ -1,6 +1,6 @@
 // src/server/db/sessions.ts
 import type { D1Database } from '@cloudflare/workers-types'
-import type { Session, Clip } from '../../lib/types'
+import type { Session, Clip, Plan, BiographyPlan } from '../../lib/types'
 import type { SessionRow } from './rows'
 import { rowToSession } from './mappers'
 
@@ -34,6 +34,13 @@ export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updat
 export async function listSessions(db: D1Database): Promise<SessionSummary[]> {
   const { results } = await db.prepare('select id,title,category,video_model,created_at,updated_at from sessions order by updated_at desc, rowid desc').all<Pick<RawSessionRow, 'id' | 'title' | 'category' | 'video_model' | 'created_at' | 'updated_at'>>()
   return results.map((r) => ({ id: r.id, title: r.title, category: r.category, videoModel: r.video_model, createdAt: Date.parse(r.created_at), updatedAt: Date.parse(r.updated_at) }))
+}
+
+export async function updateSessionPlan(db: D1Database, id: string, plan: Plan | null, bioPlan: BiographyPlan | null): Promise<void> {
+  await db
+    .prepare('update sessions set plan = ?, bio_plan = ?, updated_at = ? where id = ?')
+    .bind(plan ? JSON.stringify(plan) : null, bioPlan ? JSON.stringify(bioPlan) : null, new Date().toISOString(), id)
+    .run()
 }
 
 export async function renameSession(db: D1Database, id: string, title: string): Promise<void> {

@@ -89,6 +89,7 @@ export interface ClipPatch {
   video_key?: string | null
   duration_sec?: number | null
   error?: string | null
+  prompt?: string
 }
 
 export async function updateClipStatus(db: D1Database, id: string, patch: ClipPatch): Promise<void> {

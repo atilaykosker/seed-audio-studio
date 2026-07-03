@@ -43,6 +43,9 @@ export function generateScene(sessionId: string, sceneId: string): Promise<{ req
 export function clipStatus(id: string): Promise<{ status: string; phase?: string; videoUrl?: string; error?: FriendlyError }> {
   return call(`/api/status/clip/${id}`)
 }
+export async function editClipPrompt(clipId: string, text: string): Promise<void> {
+  await call(`/api/clips/${clipId}`, { method: 'PATCH', body: JSON.stringify({ text }) })
+}
 export async function listSessions(): Promise<SessionSummary[]> { return (await call<{ sessions: SessionSummary[] }>('/api/sessions')).sessions }
 export async function getSession(id: string): Promise<Session | null> {
   try { return (await call<{ session: Session }>(`/api/sessions/${id}`)).session } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e }
