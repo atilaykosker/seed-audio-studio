@@ -21,6 +21,6 @@
     // import of ./globals.css in app/layout.tsx. Keep it false.
     "noUncheckedSideEffectImports": false
   },
-  "include": ["next-env.d.ts", "app/**/*", "middleware.ts", "src/server/**/*", ".next/types/**/*.ts"],
+  "include": ["next-env.d.ts", "app/**/*", "middleware.ts", "src/server/**/*", ".next/types/**/*.ts", "worker-configuration.d.ts"],
   "exclude": ["node_modules"]
 }

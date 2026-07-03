@@ -1,15 +1,16 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
+import type { D1Database } from '@cloudflare/workers-types'
 
-export interface DbEnv {
-  SUPABASE_URL: string
-  SUPABASE_SERVICE_KEY: string
+export function getDb(): D1Database {
+  return getCloudflareContext().env.DB
 }
 
-export function getSupabase(env: DbEnv): SupabaseClient {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set')
-  }
-  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+/**
+ * @deprecated Supabase has been removed in favor of Cloudflare D1 (see getDb()).
+ * Temporary throwing stub kept only so route handlers not yet rewired (Task 6)
+ * still typecheck/build. Do not call this.
+ */
+export function getSupabase(..._args: unknown[]): never {
+  void _args
+  throw new Error('getSupabase removed — use getDb() (D1)')
 }

@@ -5,7 +5,13 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "vars": {},
-  // Secrets (APP_PASSWORD_HASH, SESSION_SECRET, FAL_KEY, SUPABASE_URL,
-  // SUPABASE_SERVICE_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
-  // S3_BUCKET, S3_REGION) are set via `wrangler secret put <NAME>`.
+  // NOTE: database_id is a placeholder ("local") — `wrangler d1 create bookticle-studio-db`
+  // requires Cloudflare auth (CLOUDFLARE_API_TOKEN / login), unavailable in this environment.
+  // Local `wrangler dev` works fine with the placeholder; replace with the real id before
+  // any `--remote` usage.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "bookticle-studio-db", "database_id": "local", "migrations_dir": "migrations" }
+  ],
+  // Secrets (APP_PASSWORD_HASH, SESSION_SECRET, FAL_KEY, AWS_ACCESS_KEY_ID,
+  // AWS_SECRET_ACCESS_KEY, S3_BUCKET, S3_REGION) are set via `wrangler secret put <NAME>`.
 }
