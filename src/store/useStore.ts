@@ -252,7 +252,7 @@ export const useStore = create<Store>((set, get) => ({
     set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) }))
     if (get().activeSessionId === id) {
       get().clearResults()
-      set({ activeSessionId: null })
+      set({ activeSessionId: null, brief: DEFAULT_BRIEF })
     }
   },
 
